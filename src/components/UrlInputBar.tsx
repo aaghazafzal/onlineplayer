@@ -165,7 +165,7 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               placeholder={getPlaceholder()}
-              className="w-full bg-transparent px-4 py-3.5 sm:py-4 text-base sm:text-lg font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
+              className="w-full min-w-0 bg-transparent px-3 sm:px-4 py-3 sm:py-4 text-base sm:text-lg font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
               disabled={isLoading}
             />
 
