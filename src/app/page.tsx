@@ -21,8 +21,7 @@ import {
   Monitor, 
   Lock, 
   Check, 
-  Rocket, 
-  X
+  Rocket
 } from "lucide-react";
 
 const WORKER_API_BASE = "https://terabox-player-api.onlineplayer.workers.dev";
@@ -37,7 +36,6 @@ export default function Home() {
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
 
   // Load history from localStorage
   useEffect(() => {
@@ -193,26 +191,23 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-[#f4f4f7] dark:bg-[#0e0e11] text-zinc-950 dark:text-zinc-100 transition-colors duration-200">
       
       {/* Top Navbar */}
-      <Navbar 
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        onOpenAuth={(mode) => setAuthModal(mode)}
-      />
+      <Navbar onOpenShortcuts={() => setIsShortcutsOpen(true)} />
 
       {/* Main Container - Extended Width for Laptops & Desktops */}
       <main className="flex-1 w-full max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-14 sm:space-y-18">
         
-        {/* Hero Headline (IteraPlay exact style) */}
+        {/* Universal Hero Headline */}
         <div className="text-center space-y-4 pt-2">
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-zinc-950 dark:text-white leading-[1.15]">
-            Best{" "}
+            Universal{" "}
             <span className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 bg-clip-text text-transparent">
-              TeraBox Video Player & Downloader
+              Cloud Video Player & Downloader
             </span>{" "}
             Online
           </h1>
 
           <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium max-w-3xl mx-auto leading-relaxed">
-            Login to enjoy unlimited features and video plays - Free registration available!
+            Stream and download TeraBox, Instagram, DiskPlayer, and direct cloud links instantly with zero limits & no ads.
           </p>
         </div>
 
@@ -220,7 +215,6 @@ export default function Home() {
         <UrlInputBar 
           onResolve={handleResolve} 
           isLoading={isLoading} 
-          onOpenAuth={(mode) => setAuthModal(mode)}
         />
 
         {/* Error Alert Box */}
@@ -264,22 +258,20 @@ export default function Home() {
           onRemoveItem={handleRemoveHistoryItem}
         />
 
-        {/* SECTION 1: How to Use the TeraBox Player (Wider & Larger Sizing) */}
+        {/* SECTION 1: How to Use the Online Player */}
         <section id="how-it-works" className="p-8 sm:p-12 md:p-16 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl text-center space-y-10">
           <div className="space-y-5 max-w-4xl mx-auto">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-950 dark:text-white tracking-tight">
-              How to Use the TeraBox Player
+              How to Use OnlinePlayer
             </h2>
 
             <div className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 space-y-4 leading-relaxed">
               <p>
-                <strong className="text-zinc-950 dark:text-white font-black">Tired of complicated apps?</strong> I&apos;ve been there too! That&apos;s exactly why I created this{" "}
-                <strong className="text-zinc-950 dark:text-white font-black">TeraBox Link Downloader</strong> to make your life easier. Just paste your link and start using this{" "}
-                <strong className="text-zinc-950 dark:text-white font-black">TeraBox Online Video Player</strong> instantly.
+                <strong className="text-zinc-950 dark:text-white font-black">Tired of complicated apps & restrictions?</strong> We&apos;ve been there too! That&apos;s exactly why we created this{" "}
+                <strong className="text-zinc-950 dark:text-white font-black">Universal Cloud Video Player & Downloader</strong> to make your life effortless. Just paste any link and enjoy instant, full-length high-speed streaming without installing external software.
               </p>
               <p>
-                Look, I know how frustrating it is when you just want to watch a video. That&apos;s why our streaming works differently - no software mess. Just use our{" "}
-                <span className="text-blue-500 font-bold">TeraBox Link Opener</span> and you&apos;re good to go.
+                Whether it&apos;s a long movie on TeraBox, a reel on Instagram, or a cloud drive video, our streaming engine bypasses preview limits and delivers uninterrupted HD playback.
               </p>
             </div>
           </div>
@@ -302,7 +294,7 @@ export default function Home() {
                   Find & Copy
                 </h4>
                 <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Go to TeraBox and find your video. Copy the link from the address bar or hit share.
+                  Find your video on TeraBox, Instagram, DiskPlayer, or direct cloud link and copy its URL.
                 </p>
               </div>
 
@@ -318,7 +310,7 @@ export default function Home() {
                   Paste & Play
                 </h4>
                 <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Come back here and paste it. Click &apos;Play&apos; and boom - you&apos;re watching instantly!
+                  Paste it in the box above. Click &apos;Play&apos; and your high-definition video starts playing instantly!
                 </p>
               </div>
 
@@ -334,21 +326,21 @@ export default function Home() {
                   Stream or Download
                 </h4>
                 <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Use our TeraBox Video Downloader feature to save offline or stream instantly in full resolution.
+                  Enjoy custom playback speed & subtitle support, or hit &apos;Download&apos; to save directly to your storage.
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* SECTION 2: Why Choose Our TeraBox Player? */}
+        {/* SECTION 2: Why Choose OnlinePlayer? */}
         <section id="features" className="p-8 sm:p-12 md:p-16 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl text-center space-y-10">
           <div className="space-y-3">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-950 dark:text-white tracking-tight">
-              Why Choose Our TeraBox Player?
+              Why Choose OnlinePlayer?
             </h2>
             <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium">
-              The most reliable <strong className="text-zinc-950 dark:text-white">TeraBox Link Opener</strong> experience.
+              The fastest and most reliable <strong className="text-zinc-950 dark:text-white">universal cloud streaming</strong> platform.
             </p>
           </div>
 
@@ -359,10 +351,10 @@ export default function Home() {
                 <Film className="h-8 w-8" strokeWidth={2.4} />
               </div>
               <h4 className="text-lg sm:text-xl font-black text-zinc-950 dark:text-white">
-                TeraBox Online Player
+                Multi-Cloud Support
               </h4>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Works as an online TeraBox Video Player - no downloads needed.
+                Stream videos from TeraBox, Instagram, DiskPlayer, and direct HLS streams in one single place.
               </p>
             </div>
 
@@ -375,7 +367,7 @@ export default function Home() {
                 Works Everywhere
               </h4>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Use it on your phone, laptop, tablet - works seamlessly.
+                Optimized for phones, tablets, laptops, and smart TVs with responsive gestures and keyboard controls.
               </p>
             </div>
 
@@ -385,10 +377,10 @@ export default function Home() {
                 <Zap className="h-8 w-8" strokeWidth={2.4} />
               </div>
               <h4 className="text-lg sm:text-xl font-black text-zinc-950 dark:text-white">
-                Super Fast
+                Ultra-Fast Resolving
               </h4>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Usually loads in 2-3 seconds. No waiting around.
+                Cloudflare Edge integration resolves streams in 1-2 seconds with zero buffering.
               </p>
             </div>
 
@@ -398,37 +390,34 @@ export default function Home() {
                 <Lock className="h-8 w-8" strokeWidth={2.4} />
               </div>
               <h4 className="text-lg sm:text-xl font-black text-zinc-950 dark:text-white">
-                TeraBox Downloader
+                100% Free & Unlimited
               </h4>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Completely free TeraBox Downloader. No credit card required.
+                Completely unrestricted fair use with no account required and no hidden subscriptions.
               </p>
             </div>
           </div>
         </section>
 
-        {/* SECTION 3: Why I Built This Player */}
+        {/* SECTION 3: Why I Built OnlinePlayer */}
         <section className="p-8 sm:p-12 md:p-16 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
             
             {/* Left Story Column */}
             <div className="lg:col-span-7 space-y-6">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-950 dark:text-white tracking-tight">
-                Why I Built This Player
+                Why We Built OnlinePlayer
               </h2>
 
               <div className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 space-y-4 leading-relaxed">
                 <p>
-                  Here&apos;s the thing - I got tired of ads on random sites. I wanted a clean{" "}
-                  <strong className="text-zinc-950 dark:text-white font-black">TeraBox Online Player</strong> that actually works. You know, the kind that doesn&apos;t force you to register or show 10 ads.
+                  Here&apos;s the truth - we got exhausted by spammy download sites with fake buttons, popups, and 30-second cutoffs. We wanted a clean, honest <strong className="text-zinc-950 dark:text-white font-black">Universal Online Video Player</strong> that simply works.
                 </p>
                 <p>
-                  So I built this TeraBox Player. Unlike others, our{" "}
-                  <strong className="text-zinc-950 dark:text-white font-black">TeraBox Video Player</strong> works instantly. No popups, no redirects.
+                  So we built OnlinePlayer. Unlike other tools, our video engine connects directly to high-speed cloud streams. No registration walls, no redirects, and no invasive trackers.
                 </p>
                 <p>
-                  It&apos;s a simple <strong className="text-zinc-950 dark:text-white font-black">TeraBox Link Player</strong>. You can also use it as a{" "}
-                  <strong className="text-zinc-950 dark:text-white font-black">TeraBox Link Downloader</strong> to save files for later. I created this player because the community deserved better.
+                  Use it to binge-watch movies, stream videos with friends, or download large files directly at maximum connection speed.
                 </p>
               </div>
             </div>
@@ -446,7 +435,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2.5 text-zinc-800 dark:text-zinc-200 font-medium">
                     <Rocket className="h-5 w-5 text-purple-500 shrink-0" strokeWidth={2.4} />
-                    <span><strong>Actually Fast:</strong> Processes links in 2-3 seconds</span>
+                    <span><strong>Lightning Fast:</strong> Resolves cloud links in 1-2 seconds</span>
                   </div>
                 </div>
 
@@ -456,7 +445,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2.5 text-zinc-800 dark:text-zinc-200 font-medium">
                     <Film className="h-5 w-5 text-indigo-500 shrink-0" strokeWidth={2.4} />
-                    <span><strong>Stream or Download:</strong> Your choice, instant access</span>
+                    <span><strong>Stream or Download:</strong> Your choice with instant full access</span>
                   </div>
                 </div>
 
@@ -466,7 +455,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2.5 text-zinc-800 dark:text-zinc-200 font-medium">
                     <ShieldCheck className="h-5 w-5 text-blue-500 shrink-0" strokeWidth={2.4} />
-                    <span><strong>No Ads:</strong> Clean interface, no annoying popups</span>
+                    <span><strong>Clean Experience:</strong> No intrusive ads or popup redirects</span>
                   </div>
                 </div>
 
@@ -476,7 +465,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2.5 text-zinc-800 dark:text-zinc-200 font-medium">
                     <Lock className="h-5 w-5 text-emerald-500 shrink-0" strokeWidth={2.4} />
-                    <span><strong>Private:</strong> We don&apos;t spy on what you watch</span>
+                    <span><strong>Zero Limits:</strong> No daily caps and no forced signups</span>
                   </div>
                 </div>
               </div>
@@ -492,7 +481,7 @@ export default function Home() {
               Works On Everything (Seriously)
             </h2>
             <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium">
-              Works as a <strong className="text-zinc-950 dark:text-white">TeraBox Online Player</strong> on mobile, and a reliable <strong className="text-zinc-950 dark:text-white">TeraBox Downloader</strong> for PC.
+              Seamlessly streams on mobile, tablets, and provides high-speed downloads on PC.
             </p>
           </div>
 
@@ -506,7 +495,7 @@ export default function Home() {
                 On Your Phone
               </h4>
               <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Perfect for watching on the go. Big buttons and smooth touch controls.
+                Perfect for streaming on the go. Big buttons, touch gestures, and smooth mobile controls.
               </p>
             </div>
 
@@ -519,7 +508,7 @@ export default function Home() {
                 On Tablets
               </h4>
               <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Great for watching in bed or on the couch. Streaming looks amazing on bigger screens.
+                Enjoy movies on iPad or Android tablets. Crisp HD streaming looks stunning on high-res displays.
               </p>
             </div>
 
@@ -532,7 +521,7 @@ export default function Home() {
                 On Computers
               </h4>
               <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Full power here. All features work perfectly and download speeds are super fast.
+                Full power with keyboard shortcuts (Space, seek, volume, F for fullscreen) and uncapped download speeds.
               </p>
             </div>
           </div>
@@ -552,99 +541,17 @@ export default function Home() {
         <Send className="h-6 w-6 fill-white stroke-white ml-0.5 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
       </a>
 
-      {/* Footer */}
+      {/* Clean Footer */}
       <footer className="w-full border-t border-zinc-200 dark:border-[#262633] py-10 text-center text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 bg-white/50 dark:bg-black/20">
         <div className="max-w-[1360px] mx-auto px-4 space-y-2">
           <p className="font-bold text-zinc-800 dark:text-zinc-200">
-            OnlinePlayer — High-Speed Cloud Stream Engine & TeraBox Downloader
+            OnlinePlayer — Universal High-Speed Cloud Stream Engine & Downloader
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-500">
             OnlinePlayer does not host or store any video files on its servers. All media content is resolved directly through official cloud storage streams.
           </p>
         </div>
       </footer>
-
-      {/* Auth Modal (Login / Sign Up) */}
-      {authModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl relative space-y-5">
-            <button
-              onClick={() => setAuthModal(null)}
-              className="absolute top-5 right-5 p-1.5 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#20202a] transition-colors"
-            >
-              <X className="h-5 w-5" strokeWidth={2.4} />
-            </button>
-
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold text-zinc-950 dark:text-white">
-                {authModal === "login" ? "Welcome Back" : "Create Free Account"}
-              </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {authModal === "login" 
-                  ? "Sign in to unlock unlimited daily video plays & cloud downloads." 
-                  : "Join OnlinePlayer for instant link extraction and unlimited speeds."}
-              </p>
-            </div>
-
-            <form onSubmit={(e) => { e.preventDefault(); setAuthModal(null); }} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="name@example.com"
-                  className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-[#121217] border border-zinc-300 dark:border-[#2a2a38] text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-[#121217] border border-zinc-300 dark:border-[#2a2a38] text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-500/25 active:scale-95 transition-all cursor-pointer"
-              >
-                {authModal === "login" ? "Sign In" : "Get Started Free"}
-              </button>
-            </form>
-
-            <div className="text-center text-xs text-zinc-500">
-              {authModal === "login" ? (
-                <p>
-                  Don&apos;t have an account?{" "}
-                  <button
-                    onClick={() => setAuthModal("signup")}
-                    className="text-blue-500 font-bold hover:underline"
-                  >
-                    Sign up
-                  </button>
-                </p>
-              ) : (
-                <p>
-                  Already have an account?{" "}
-                  <button
-                    onClick={() => setAuthModal("login")}
-                    className="text-blue-500 font-bold hover:underline"
-                  >
-                    Login
-                  </button>
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Keyboard Shortcuts Modal */}
       <ShortcutsModal

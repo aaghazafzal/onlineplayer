@@ -7,21 +7,16 @@ import {
   ClipboardPaste, 
   X, 
   Loader2, 
-  Clock, 
-  Sparkles, 
   HardDrive, 
   Camera, 
   Radio, 
-  CheckCircle2, 
-  Zap, 
-  ShieldCheck 
+  Zap
 } from "lucide-react";
 
 interface UrlInputBarProps {
   onResolve: (url: string, autoDownload?: boolean) => void;
   isLoading: boolean;
   initialUrl?: string;
-  onOpenAuth?: (mode: "login" | "signup") => void;
 }
 
 export type ProviderTab = "terabox" | "instagram" | "diskplayer" | "direct";
@@ -30,17 +25,14 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
   onResolve,
   isLoading,
   initialUrl = "",
-  onOpenAuth,
 }) => {
   const [inputUrl, setInputUrl] = useState(initialUrl);
   const [activeTab, setActiveTab] = useState<ProviderTab>("terabox");
-  const [resolvedProvider, setResolvedProvider] = useState<ProviderTab | null>(null);
 
   // Auto-detect provider from user input
   useEffect(() => {
     const val = inputUrl.trim().toLowerCase();
     if (!val) {
-      setResolvedProvider(null);
       return;
     }
 
@@ -54,16 +46,12 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
       val.includes("surl=") ||
       val.includes("/s/1")
     ) {
-      setResolvedProvider("terabox");
       setActiveTab("terabox");
     } else if (val.includes("instagram.com") || val.includes("instagr.am")) {
-      setResolvedProvider("instagram");
       setActiveTab("instagram");
     } else if (val.includes("disk") || val.includes("disko")) {
-      setResolvedProvider("diskplayer");
       setActiveTab("diskplayer");
     } else if (val.endsWith(".m3u8") || val.endsWith(".mp4")) {
-      setResolvedProvider("direct");
       setActiveTab("direct");
     }
   }, [inputUrl]);
@@ -93,19 +81,18 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
 
   const handleClear = () => {
     setInputUrl("");
-    setResolvedProvider(null);
   };
 
   const getPlaceholder = () => {
     switch (activeTab) {
       case "instagram":
-        return "Paste your Instagram Reel or Post link here...";
+        return "Paste your Instagram Reel or Post video link here...";
       case "diskplayer":
         return "Paste your DiskPlayer link here...";
       case "direct":
         return "Paste direct MP4 or M3U8 video stream URL...";
       default:
-        return "Paste your TeraBox link here...";
+        return "Paste your TeraBox link here (1024tera, terabox.app, dubox, nephobox)...";
     }
   };
 
@@ -120,7 +107,7 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab("terabox")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === "terabox"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
                 : "bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#242430]"
@@ -133,7 +120,7 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab("instagram")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === "instagram"
                 ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-600/25"
                 : "bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#242430]"
@@ -146,7 +133,7 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab("diskplayer")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === "diskplayer"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
                 : "bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#242430]"
@@ -159,7 +146,7 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab("direct")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === "direct"
                 ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/25"
                 : "bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#242430]"
@@ -187,7 +174,7 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
               <button
                 type="button"
                 onClick={handleClear}
-                className="p-2 mr-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+                className="p-2 mr-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                 title="Clear input"
               >
                 <X className="h-4 w-4" strokeWidth={2.5} />
@@ -239,38 +226,6 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
             </button>
           </div>
         </form>
-      </div>
-
-      {/* Guest Limit & Service Status Bar */}
-      <div className="p-5 sm:px-8 rounded-2xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-xs sm:text-sm">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-            <Clock className="h-4.5 w-4.5" strokeWidth={2.4} />
-          </div>
-          <div>
-            <span className="font-bold text-zinc-950 dark:text-white text-sm">
-              Guest Limit: 5/5 plays or downloads
-            </span>
-            <span className="text-zinc-500 dark:text-zinc-400 ml-2">
-              Resets in: 3h 7m
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          <button
-            onClick={() => onOpenAuth?.("login")}
-            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-[#4f46e5] hover:bg-[#4338ca] transition-all shadow-sm cursor-pointer"
-          >
-            Login for Unlimited
-          </button>
-          <a
-            href="#how-it-works"
-            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-[#059669] hover:bg-[#047857] text-center transition-all shadow-sm cursor-pointer"
-          >
-            Free Alternative
-          </a>
-        </div>
       </div>
     </div>
   );
