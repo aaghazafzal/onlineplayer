@@ -543,9 +543,15 @@ export default function Home() {
 
       {/* Clean Footer */}
       <footer className="w-full border-t border-zinc-200 dark:border-[#262633] py-10 text-center text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 bg-white/50 dark:bg-black/20">
-        <div className="max-w-[1360px] mx-auto px-4 space-y-2">
-          <p className="font-bold text-zinc-800 dark:text-zinc-200">
-            OnlinePlayer — Universal High-Speed Cloud Stream Engine & Downloader
+        <div className="max-w-[1360px] mx-auto px-4 space-y-2.5">
+          <div className="flex items-center justify-center gap-2">
+            <img src="/logo.png" alt="OnlinePlayer" className="h-6 w-6 object-contain" />
+            <p className="font-extrabold text-zinc-900 dark:text-zinc-100 text-sm">
+              OnlinePlayer
+            </p>
+          </div>
+          <p className="font-semibold text-zinc-700 dark:text-zinc-300 text-xs">
+            Universal High-Speed Cloud Stream Engine & Downloader
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-500">
             OnlinePlayer does not host or store any video files on its servers. All media content is resolved directly through official cloud storage streams.

@@ -64,9 +64,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
 
             {/* Brand Logo */}
             <a href="/" className="flex items-center gap-2.5 group">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform shrink-0">
-                <Play className="h-4.5 w-4.5 sm:h-5 sm:w-5 fill-white stroke-white ml-0.5" strokeWidth={2.5} />
-              </div>
+              <img
+                src="/logo.png"
+                alt="OnlinePlayer"
+                className="h-9 w-9 sm:h-10 sm:w-10 object-contain drop-shadow-md group-hover:scale-105 transition-transform shrink-0"
+              />
               <div className="flex items-baseline gap-1.5">
                 <span className="font-black text-xl sm:text-2xl tracking-tight text-zinc-950 dark:text-white">
                   Online<span className="bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">Player</span>
@@ -154,9 +156,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
               {/* Drawer Brand Header */}
               <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-[#22222a]">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-8.5 w-8.5 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                    <Play className="h-4.5 w-4.5 fill-white stroke-white ml-0.5" strokeWidth={2.5} />
-                  </div>
+                  <img
+                    src="/logo.png"
+                    alt="OnlinePlayer"
+                    className="h-8.5 w-8.5 object-contain drop-shadow-sm shrink-0"
+                  />
                   <span className="font-black text-xl tracking-tight text-zinc-950 dark:text-white">
                     Online<span className="text-blue-500">Player</span>
                   </span>
