@@ -57,7 +57,7 @@ export const VideoMetaCard: React.FC<VideoMetaCardProps> = ({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-4">
+    <div className="w-full max-w-[1360px] mx-auto space-y-5">
       {/* Primary Card */}
       <div className="p-5 sm:p-7 rounded-3xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-xl shadow-zinc-950/5 dark:shadow-black/40">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">

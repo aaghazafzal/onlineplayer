@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OmniPlay — Best TeraBox Video Player & Downloader Online",
-  description: "Fast, ad-free online video player & high-speed downloader for TeraBox, Instagram, DiskPlayer, and direct cloud streams without 30-second preview cutoffs.",
+  title: "OnlinePlayer — Best TeraBox Video Player & Downloader Online",
+  description: "Fast, ad-free online video player & high-speed downloader for TeraBox, Instagram, DiskPlayer, and direct cloud streams without preview cutoffs.",
 };
 
 export default function RootLayout({
@@ -24,12 +24,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}>
+    <html 
+      lang="en" 
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      suppressHydrationWarning
+    >
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className="min-h-full flex flex-col antialiased">
+      <body className="min-h-full flex flex-col antialiased" suppressHydrationWarning>
         <ThemeProvider>
           {children}
         </ThemeProvider>

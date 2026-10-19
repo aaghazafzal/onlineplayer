@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts, onOpenAuth }) =
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#f4f4f7]/95 dark:bg-[#0e0e11]/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#262633] transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
         
         {/* Left: Hamburger + Logo */}
         <div className="flex items-center gap-3">
@@ -52,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts, onOpenAuth }) =
             </div>
             <div className="flex items-baseline gap-1">
               <span className="font-extrabold text-xl tracking-tight text-zinc-950 dark:text-white">
-                Omni<span className="text-blue-500">Play</span>
+                Online<span className="text-blue-500">Player</span>
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60 hidden sm:inline-block">
                 PRO

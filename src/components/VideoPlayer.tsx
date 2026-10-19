@@ -355,7 +355,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
       className={`relative w-full rounded-3xl overflow-hidden bg-black shadow-2xl transition-all duration-300 border border-zinc-800 ${
-        isTheaterMode ? "max-w-7xl mx-auto" : "max-w-5xl mx-auto"
+        isTheaterMode ? "max-w-[1500px] mx-auto" : "max-w-[1360px] mx-auto"
       }`}
     >
       {/* 16:9 Video Aspect Container */}

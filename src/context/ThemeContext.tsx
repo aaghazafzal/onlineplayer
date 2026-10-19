@@ -21,7 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("omni_theme") as Theme | null;
+    const savedTheme = (localStorage.getItem("onlineplayer_theme") || localStorage.getItem("omni_theme")) as Theme | null;
     if (savedTheme === "light" || savedTheme === "dark") {
       setThemeState(savedTheme);
       document.documentElement.classList.toggle("dark", savedTheme === "dark");
@@ -35,7 +35,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem("omni_theme", newTheme);
+    localStorage.setItem("onlineplayer_theme", newTheme);
     document.documentElement.classList.toggle("dark", newTheme === "dark");
   };
 
