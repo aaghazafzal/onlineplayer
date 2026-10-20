@@ -47,19 +47,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full bg-[#f4f4f7]/95 dark:bg-[#0e0e11]/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#262633] transition-colors duration-200">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between">
+      <header className="sticky top-0 z-40 w-full bg-[#f4f4f7]/95 dark:bg-[#0e0e11]/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#22222d] transition-colors duration-200">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           {/* Left: Hamburger Button + Brand Logo */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             {/* Hamburger Button (IteraPlay style) */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 sm:p-2.5 rounded-xl border border-zinc-300 dark:border-[#2a2a38] bg-white dark:bg-[#18181f] text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#20202a] transition-all cursor-pointer active:scale-95"
+              className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl border border-zinc-300 dark:border-[#28283a] bg-white dark:bg-[#14141d] text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1e1e2c] flex items-center justify-center shadow-xs transition-all cursor-pointer active:scale-95"
               aria-label="Open sidebar menu"
               title="Open Navigation"
             >
-              <Menu className="h-5 w-5" strokeWidth={2.4} />
+              <Menu className="h-5 w-5 sm:h-5.5 sm:w-5.5" strokeWidth={2.4} />
             </button>
 
             {/* Brand Logo */}
@@ -80,19 +80,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
             </a>
           </div>
 
-          {/* Center: Desktop Floating Pill Navigation (IteraPlay style) */}
-          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-full bg-white dark:bg-[#15151c] border border-zinc-200/90 dark:border-[#272736] shadow-sm">
+          {/* Center: Desktop Navigation Bar (Exact IteraPlay style: rounded-2xl, taller, larger text) */}
+          <nav className="hidden lg:flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-[#14141d] border border-zinc-200 dark:border-[#262636] shadow-sm">
             {/* Home */}
             <a
               href="/"
               onClick={() => setActiveItem("home")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeItem === "home"
-                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+                  ? "bg-zinc-200/90 dark:bg-[#28283a] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1e1e2c]"
               }`}
             >
-              <HomeIcon className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <HomeIcon className="h-4 w-4" strokeWidth={2.4} />
               <span>Home</span>
             </a>
 
@@ -100,13 +100,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
             <a
               href="#features"
               onClick={() => setActiveItem("providers")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeItem === "providers"
-                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+                  ? "bg-zinc-200/90 dark:bg-[#28283a] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1e1e2c]"
               }`}
             >
-              <Film className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <Film className="h-4 w-4" strokeWidth={2.4} />
               <span>Providers</span>
             </a>
 
@@ -114,13 +114,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
             <a
               href="#how-it-works"
               onClick={() => setActiveItem("guide")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeItem === "guide"
-                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+                  ? "bg-zinc-200/90 dark:bg-[#28283a] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1e1e2c]"
               }`}
             >
-              <BookOpen className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <BookOpen className="h-4 w-4" strokeWidth={2.4} />
               <span>How To Use</span>
             </a>
 
@@ -130,29 +130,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
               target="_blank"
               rel="noreferrer"
               onClick={() => setActiveItem("api")}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeItem === "api"
-                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+                  ? "bg-zinc-200/90 dark:bg-[#28283a] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1e1e2c]"
               }`}
             >
-              <Code2 className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <Code2 className="h-4 w-4" strokeWidth={2.4} />
               <span>API</span>
             </a>
           </nav>
 
-          {/* Right: Shortcuts + Theme Toggle Capsule */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5">
+          {/* Right: Bold Shortcuts Button + Theme Toggle Capsule */}
+          <div className="flex items-center gap-3">
             {/* Bold Keyboard Shortcuts Button */}
             {onOpenShortcuts && (
               <button
                 onClick={onOpenShortcuts}
-                className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold text-zinc-800 dark:text-zinc-200 bg-white dark:bg-[#181820] hover:bg-zinc-100 dark:hover:bg-[#22222e] border border-zinc-300 dark:border-[#2b2b3a] shadow-xs hover:border-blue-500 dark:hover:border-blue-500 transition-all cursor-pointer active:scale-95"
+                className="hidden sm:flex items-center gap-2.5 px-4 h-11 sm:h-12 rounded-2xl text-sm font-bold text-zinc-800 dark:text-zinc-200 bg-white dark:bg-[#14141d] hover:bg-zinc-100 dark:hover:bg-[#1e1e2c] border border-zinc-300 dark:border-[#262636] shadow-xs hover:border-blue-500 dark:hover:border-blue-500 transition-all cursor-pointer active:scale-95"
                 title="Keyboard Shortcuts"
               >
-                <Keyboard className="h-4 w-4 text-blue-500" strokeWidth={2.4} />
+                <Keyboard className="h-4.5 w-4.5 text-blue-500" strokeWidth={2.4} />
                 <span>Shortcuts</span>
-                <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-black rounded bg-zinc-100 dark:bg-[#262636] text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-[#353548]">
+                <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[11px] font-black rounded-md bg-zinc-100 dark:bg-[#262638] text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-[#38384e]">
                   ?
                 </kbd>
               </button>
@@ -161,21 +161,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
             {/* Day / Night Mode Pill Toggle */}
             <button
               onClick={toggleTheme}
-              className="relative flex items-center h-8 sm:h-8.5 w-14 sm:w-15 rounded-full bg-zinc-200 dark:bg-[#18181f] border border-zinc-300 dark:border-[#2e2e3e] p-1 transition-colors cursor-pointer"
+              className="relative flex items-center h-9 sm:h-10 w-15 sm:w-16 rounded-full bg-zinc-200 dark:bg-[#14141d] border border-zinc-300 dark:border-[#262636] p-1 transition-colors cursor-pointer"
               aria-label="Toggle theme mode"
               title={theme === "dark" ? "Switch to Day Mode" : "Switch to Night Mode"}
             >
               <div
-                className={`h-6 sm:h-6.5 w-6 sm:w-6.5 rounded-full flex items-center justify-center transition-transform duration-200 ${
+                className={`h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-full flex items-center justify-center transition-transform duration-200 ${
                   theme === "dark"
                     ? "translate-x-6 sm:translate-x-6.5 bg-[#2563eb] text-white shadow-md"
                     : "translate-x-0 bg-white text-amber-500 shadow-md"
                 }`}
               >
                 {theme === "dark" ? (
-                  <Moon className="h-3.5 w-3.5 fill-white stroke-white" strokeWidth={2.4} />
+                  <Moon className="h-4 w-4 fill-white stroke-white" strokeWidth={2.4} />
                 ) : (
-                  <Sun className="h-3.5 w-3.5 fill-amber-500 stroke-amber-500" strokeWidth={2.4} />
+                  <Sun className="h-4 w-4 fill-amber-500 stroke-amber-500" strokeWidth={2.4} />
                 )}
               </div>
             </button>
