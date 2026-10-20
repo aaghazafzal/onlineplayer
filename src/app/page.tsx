@@ -36,6 +36,7 @@ export default function Home() {
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [autoStartDownload, setAutoStartDownload] = useState(false);
 
   // Load history from localStorage
   useEffect(() => {
@@ -88,14 +89,11 @@ export default function Home() {
       setFilesList([]);
       setCurrentFileIndex(0);
       setIsLoading(false);
+      setAutoStartDownload(autoDownload);
 
-      if (autoDownload) {
-        window.open(url, "_blank");
-      } else {
-        setTimeout(() => {
-          document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
-        }, 150);
-      }
+      setTimeout(() => {
+        document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
       return;
     }
 
@@ -153,12 +151,14 @@ export default function Home() {
       }
 
       if (autoDownload) {
-        window.open(activeFile.stream_url, "_blank");
+        setAutoStartDownload(true);
       } else {
-        setTimeout(() => {
-          document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
-        }, 150);
+        setAutoStartDownload(false);
       }
+
+      setTimeout(() => {
+        document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
 
     } catch (err: any) {
       console.error("Resolve error:", err);
@@ -246,6 +246,7 @@ export default function Home() {
               currentFileIndex={currentFileIndex}
               onSelectFile={handleSelectFile}
               isCached={isCachedHit}
+              autoStartDownload={autoStartDownload}
             />
           </div>
         )}
