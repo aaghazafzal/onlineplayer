@@ -84,7 +84,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       hlsRef.current = null;
     }
 
-    if (Hls.isSupported()) {
+    const isHls = activeUrl.includes(".m3u8") || activeUrl.includes("m3u8");
+
+    if (isHls && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -131,12 +133,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         }
       });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    } else if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
       // Native Safari iOS/macOS HLS support
       video.src = activeUrl;
       video.addEventListener("loadedmetadata", () => {
         video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       });
+    } else {
+      // Native MP4 / Progressive Stream playback (Instagram, direct MP4)
+      video.src = activeUrl;
+      video.load();
+      video.onloadedmetadata = () => {
+        if (streamData.surl) {
+          const savedPos = localStorage.getItem(`pos_${streamData.surl}`);
+          if (savedPos) {
+            const pos = parseFloat(savedPos);
+            if (pos > 5 && pos < (video.duration || 100000) - 10) {
+              video.currentTime = pos;
+            }
+          }
+        }
+        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      };
+      video.onerror = () => {
+        console.error("Native video element playback error");
+        setPlayerError("Video stream could not be loaded. Please check the link or retry.");
+      };
     }
 
     return () => {

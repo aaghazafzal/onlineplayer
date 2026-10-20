@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 const WORKER_API_BASE = "https://terabox.onlineplayer.site";
+const INSTAGRAM_WORKER_API_BASE = "https://instagram.onlineplayer.site";
 
 const FAQ_ITEMS = [
   {
@@ -164,18 +165,88 @@ export default function Home() {
       lowerUrl.includes("surl=") ||
       lowerUrl.includes("/s/1")
     );
+    const isInstagram = (
+      lowerUrl.includes("instagram.com") ||
+      lowerUrl.includes("instagr.am")
+    );
+
+    // Instagram Reel / Video Resolver
+    if (isInstagram) {
+      try {
+        const targetApi = `${INSTAGRAM_WORKER_API_BASE}/api/resolve?url=${encodeURIComponent(url)}`;
+        const res = await fetch(targetApi);
+        const data = await res.json();
+
+        if (!res.ok || data.status === "error" || data.error) {
+          throw new Error(data.error || "Could not resolve Instagram video. Please make sure the account or post is public.");
+        }
+
+        const medias = data.medias || [];
+        if (medias.length === 0) {
+          throw new Error("No playable video or media found for this Instagram link.");
+        }
+
+        const primary = medias.find((m: any) => m.type === "video") || medias[0];
+        const title = data.title || `Instagram Video (${data.shortcode || "Reel"})`;
+
+        const newStream: StreamData = {
+          streamUrl: primary.stream_url,
+          title: title,
+          durationFormatted: "Instagram Video",
+          sizeFormatted: primary.type === "video" ? "HD MP4" : "Photo",
+          thumbnail: primary.thumbnail,
+          surl: data.shortcode,
+        };
+
+        setStreamData(newStream);
+
+        if (medias.length > 1) {
+          const items: FileItem[] = medias.map((m: any, idx: number) => ({
+            fs_id: `ig-${data.shortcode}-${idx}`,
+            filename: m.filename || `Instagram Media ${idx + 1}.${m.type === "video" ? "mp4" : "jpg"}`,
+            size_formatted: m.type === "video" ? "HD Video" : "Photo",
+            duration_formatted: m.type === "video" ? "Instagram Video" : "Photo",
+            thumbnail: m.thumbnail || "",
+            stream_url: m.stream_url,
+          }));
+          setFilesList(items);
+        } else {
+          setFilesList([]);
+        }
+
+        setCurrentFileIndex(0);
+        saveToHistory({
+          surl: data.shortcode || url,
+          originalUrl: url,
+          title: title,
+          durationFormatted: "Instagram Video",
+          sizeFormatted: primary.type === "video" ? "HD MP4" : "Photo",
+          thumbnail: primary.thumbnail || "",
+          streamUrl: primary.stream_url,
+          playedAt: Date.now(),
+        });
+
+        setIsLoading(false);
+        setAutoStartDownload(autoDownload);
+
+        setTimeout(() => {
+          document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
+        }, 150);
+        return;
+      } catch (igErr: any) {
+        setIsLoading(false);
+        setErrorMessage(igErr.message || "Failed to resolve Instagram video. Please make sure the post is public and active.");
+        return;
+      }
+    }
 
     if (!isTeraBox) {
       setIsLoading(false);
-      if (lowerUrl.includes("instagram.com") || lowerUrl.includes("instagr.am")) {
-        setErrorMessage("Instagram reel/video extractor is coming soon in the next update! Currently, TeraBox links are fully active. Explore the Supported Platforms section below.");
-        return;
-      }
       if (lowerUrl.includes("diskwala") || lowerUrl.includes("disk")) {
-        setErrorMessage("DiskWala cloud extractor will be activated in the next update! Currently, TeraBox links are fully active. Explore the Supported Platforms section below.");
+        setErrorMessage("DiskWala cloud extractor will be activated in the next update! Currently, TeraBox and Instagram are fully active. Explore the Supported Platforms section below.");
         return;
       }
-      setErrorMessage("This provider is not supported yet. Currently, TeraBox links (1024tera, terabox.app, etc.) and Direct Streams are supported. Check the Supported Platforms section below.");
+      setErrorMessage("This provider is not supported yet. Currently, TeraBox, Instagram, and Direct Streams are supported. Check the Supported Platforms section below.");
       return;
     }
 
