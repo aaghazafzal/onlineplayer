@@ -21,10 +21,49 @@ import {
   Monitor, 
   Lock, 
   Check, 
-  Rocket
+  Rocket,
+  CheckCircle2,
+  ArrowRight,
+  Sparkles,
+  ChevronDown
 } from "lucide-react";
 
-const WORKER_API_BASE = "https://terabox-player-api.onlineplayer.workers.dev";
+const WORKER_API_BASE = "https://terabox.onlineplayer.site";
+
+const FAQ_ITEMS = [
+  {
+    question: "Is it legal to stream and download videos using OnlinePlayer?",
+    answer: "Yes! OnlinePlayer operates as a client-side cloud stream resolver. We do not host, re-encode, or store any media files on our servers. You are accessing and playing files that are already shared publicly through cloud storage platforms like TeraBox."
+  },
+  {
+    question: "Do I need to install any software or extensions?",
+    answer: "No! OnlinePlayer works 100% inside your standard web browser. There is no software, APK, or browser extension required. Simply paste your link and enjoy instant streaming or downloading across PC, Mac, Android, and iOS."
+  },
+  {
+    question: "Is there a limit on video size or duration?",
+    answer: "Zero limits! Unlike official cloud viewers that lock video playback behind 30-second preview restrictions, our streaming technology extracts the genuine full-length video whether it is a short clip or a 4-hour 4K movie."
+  },
+  {
+    question: "Why is my video not downloading or playing?",
+    answer: "Ensure your link is public and has not been deleted or expired by the original owner. Links that require passwords, expired share tokens, or links to non-video formats cannot be streamed."
+  },
+  {
+    question: "Is my personal data safe and anonymous?",
+    answer: "100% safe. We require no user accounts, no login passwords, and no email signups. We never track your streaming activity, nor do we store cookies with personal user logs."
+  },
+  {
+    question: "Which TeraBox domains are supported by OnlinePlayer?",
+    answer: "We support all official TeraBox domains and regional mirrors including terabox.app, 1024tera.com, 1024terabox.com, terasharelink.com, terafileshare.com, nephobox.com, dubox.com, and mirrobox.com."
+  },
+  {
+    question: "How does the player work on different devices?",
+    answer: "OnlinePlayer is completely responsive. On mobile phones (iPhone & Android), it features an edge-to-edge landscape auto-rotate player. On laptops and desktop computers, it provides keyboard shortcuts (Space to play/pause, Arrow keys for seek/volume, F for fullscreen)."
+  },
+  {
+    question: "Is OnlinePlayer completely free to use?",
+    answer: "Yes, OnlinePlayer is completely free with unrestricted access. There are no subscriptions, no credit cards required, and no hidden paywalls."
+  }
+];
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -37,8 +76,9 @@ export default function Home() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [autoStartDownload, setAutoStartDownload] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
-  // Load history from localStorage
+  // Load history from localStorage and check query params for auto-resolve
   useEffect(() => {
     try {
       const saved = localStorage.getItem("onlineplayer_history") || localStorage.getItem("omni_history");
@@ -47,6 +87,16 @@ export default function Home() {
       }
     } catch (e) {
       console.warn("Failed to load history:", e);
+    }
+
+    // Auto-resolve if ?url= or ?play= is in URL
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const targetUrl = params.get("url") || params.get("play");
+      const shouldDownload = params.get("download") === "1" || params.get("action") === "download";
+      if (targetUrl) {
+        handleResolve(targetUrl, shouldDownload);
+      }
     }
   }, []);
 
@@ -94,6 +144,38 @@ export default function Home() {
       setTimeout(() => {
         document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
       }, 150);
+      return;
+    }
+
+    // Provider check & validation
+    const lowerUrl = url.trim().toLowerCase();
+    const isTeraBox = (
+      lowerUrl.includes("terabox") ||
+      lowerUrl.includes("1024tera") ||
+      lowerUrl.includes("1024terabox") ||
+      lowerUrl.includes("dubox") ||
+      lowerUrl.includes("nephobox") ||
+      lowerUrl.includes("mirrobox") ||
+      lowerUrl.includes("momerybox") ||
+      lowerUrl.includes("tibibox") ||
+      lowerUrl.includes("freeterabox") ||
+      lowerUrl.includes("terasharelink") ||
+      lowerUrl.includes("terafileshare") ||
+      lowerUrl.includes("surl=") ||
+      lowerUrl.includes("/s/1")
+    );
+
+    if (!isTeraBox) {
+      setIsLoading(false);
+      if (lowerUrl.includes("instagram.com") || lowerUrl.includes("instagr.am")) {
+        setErrorMessage("Instagram reel/video extractor is coming soon in the next update! Currently, TeraBox links are fully active. Explore the Supported Platforms section below.");
+        return;
+      }
+      if (lowerUrl.includes("diskwala") || lowerUrl.includes("disk")) {
+        setErrorMessage("DiskWala cloud extractor will be activated in the next update! Currently, TeraBox links are fully active. Explore the Supported Platforms section below.");
+        return;
+      }
+      setErrorMessage("This provider is not supported yet. Currently, TeraBox links (1024tera, terabox.app, etc.) and Direct Streams are supported. Check the Supported Platforms section below.");
       return;
     }
 
@@ -207,7 +289,7 @@ export default function Home() {
           </h1>
 
           <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium max-w-3xl mx-auto leading-relaxed">
-            Stream and download TeraBox, Instagram, DiskPlayer, and direct cloud links instantly with zero limits & no ads.
+            Stream and download TeraBox, Instagram, DiskWala, and direct cloud links instantly with zero limits & no ads.
           </p>
         </div>
 
@@ -221,9 +303,16 @@ export default function Home() {
         {errorMessage && (
           <div className="max-w-5xl mx-auto p-5 sm:p-6 rounded-3xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-sm flex items-start gap-3.5 shadow-sm">
             <AlertCircle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" strokeWidth={2.4} />
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <p className="font-bold text-base">Unable to resolve video stream</p>
               <p className="text-xs sm:text-sm text-red-600 dark:text-red-400 leading-relaxed">{errorMessage}</p>
+              <a
+                href="#providers"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline pt-1"
+              >
+                <span>View Supported Platforms &amp; Status</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
             </div>
           </div>
         )}
@@ -258,6 +347,394 @@ export default function Home() {
           onClearHistory={handleClearHistory}
           onRemoveItem={handleRemoveHistoryItem}
         />
+
+        {/* SECTION: Supported Platforms & Providers */}
+        <section id="providers" className="p-8 sm:p-12 md:p-16 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl space-y-10 scroll-mt-24">
+          {/* Header */}
+          <div className="space-y-3 text-center max-w-3xl mx-auto">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-950 dark:text-white tracking-tight">
+              Supported Platforms
+            </h2>
+            <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium">
+              Stream and download videos with zero limits, no preview cutoffs, and ad-free playback from all major cloud platforms.
+            </p>
+          </div>
+
+          {/* Provider Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            
+            {/* CARD 1: TeraBox */}
+            <div className="group relative p-7 sm:p-8 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300 flex flex-col justify-between shadow-xs hover:shadow-xl">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <img 
+                    src="/providers/terabox.png" 
+                    alt="TeraBox Logo" 
+                    className="h-12 w-auto sm:h-14 object-contain group-hover:scale-105 transition-transform"
+                  />
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-[#181822] text-zinc-800 dark:text-zinc-200 border border-zinc-300/80 dark:border-[#28283a]">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    Live & Bypassed
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white group-hover:text-blue-500 transition-colors">
+                    TeraBox
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    Cloud Storage & Video Sharing
+                  </p>
+                </div>
+
+                {/* Feature Checkpoints */}
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>100% Full-Length Stream (No 30s cutoff)</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Multi-Quality: 1080p, 720p, 480p, 360p</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>High-Speed Direct Downloader</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Search & Browse Videos Catalog</span>
+                  </div>
+                </div>
+
+                {/* Supported Domains */}
+                <div className="pt-2">
+                  <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Supported Domains</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["terabox.app", "1024tera.com", "terasharelink.com", "nephobox", "dubox"].map((dom) => (
+                      <span key={dom} className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-zinc-200/70 dark:bg-[#1a1a24] text-zinc-700 dark:text-zinc-300 border border-zinc-300/40 dark:border-[#272737]">
+                        {dom}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-6 mt-6 border-t border-zinc-200/80 dark:border-[#222230]">
+                <button
+                  type="button"
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                >
+                  <span>Use TeraBox Player</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* CARD 2: Instagram */}
+            <div className="group relative p-7 sm:p-8 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300 flex flex-col justify-between shadow-xs hover:shadow-xl">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <img 
+                    src="/providers/instagram.png" 
+                    alt="Instagram Logo" 
+                    className="h-12 w-auto sm:h-14 object-contain group-hover:scale-105 transition-transform"
+                  />
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-[#181822] text-zinc-800 dark:text-zinc-200 border border-zinc-300/80 dark:border-[#28283a]">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    Reels & Videos
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white group-hover:text-blue-500 transition-colors">
+                    Instagram
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    Reels, Posts & IGTV Videos
+                  </p>
+                </div>
+
+                {/* Feature Checkpoints */}
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Instant Reel & Post Video Extractor</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Original Audio & HD Quality (1080p)</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>One-Click MP4 Direct Downloader</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>No Login or Account Needed</span>
+                  </div>
+                </div>
+
+                {/* Supported Domains */}
+                <div className="pt-2">
+                  <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Supported Links</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["instagram.com/reel/", "instagram.com/p/", "instagram.com/tv/", "instagr.am"].map((dom) => (
+                      <span key={dom} className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-zinc-200/70 dark:bg-[#1a1a24] text-zinc-700 dark:text-zinc-300 border border-zinc-300/40 dark:border-[#272737]">
+                        {dom}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-6 mt-6 border-t border-zinc-200/80 dark:border-[#222230]">
+                <button
+                  type="button"
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                >
+                  <span>Use Instagram Player</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* CARD 3: DiskWala */}
+            <div className="group relative p-7 sm:p-8 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300 flex flex-col justify-between shadow-xs hover:shadow-xl">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <img 
+                    src="/providers/diskwala.png" 
+                    alt="DiskWala Logo" 
+                    className="h-12 w-auto sm:h-14 object-contain group-hover:scale-105 transition-transform"
+                  />
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-[#181822] text-zinc-800 dark:text-zinc-200 border border-zinc-300/80 dark:border-[#28283a]">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                    Cloud Storage
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white group-hover:text-blue-500 transition-colors">
+                    DiskWala
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    Fast Cloud Storage & Direct Files
+                  </p>
+                </div>
+
+                {/* Feature Checkpoints */}
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Instant Cloud Video Stream Playback</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Zero Buffering & Direct CDN Speed</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Full File Download Acceleration</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0" />
+                    <span>Encrypted & Safe Media Streaming</span>
+                  </div>
+                </div>
+
+                {/* Supported Domains */}
+                <div className="pt-2">
+                  <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Supported Domains</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["diskwala.com", "disk.diskwala.com"].map((dom) => (
+                      <span key={dom} className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-zinc-200/70 dark:bg-[#1a1a24] text-zinc-700 dark:text-zinc-300 border border-zinc-300/40 dark:border-[#272737]">
+                        {dom}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-6 mt-6 border-t border-zinc-200/80 dark:border-[#222230]">
+                <button
+                  type="button"
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                >
+                  <span>Use DiskWala Player</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Request a Platform Banner */}
+          <div className="p-6 sm:p-8 rounded-[24px] bg-gradient-to-r from-blue-900/10 via-purple-900/10 to-indigo-900/10 dark:from-blue-950/40 dark:via-purple-950/40 dark:to-indigo-950/40 border border-blue-500/20 flex flex-col sm:flex-row items-center justify-between gap-5 text-center sm:text-left">
+            <div className="space-y-1">
+              <h4 className="text-lg sm:text-xl font-bold text-zinc-950 dark:text-white flex items-center justify-center sm:justify-start gap-2">
+                <Sparkles className="h-5 w-5 text-amber-400" />
+                <span>Want Another Platform Supported?</span>
+              </h4>
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
+                We are actively adding Google Drive, Mega.nz, YouTube, and MediaFire. Let us know which one you need next!
+              </p>
+            </div>
+            <a
+              href="https://t.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-xs sm:text-sm hover:scale-105 transition-transform whitespace-nowrap cursor-pointer shadow-md"
+            >
+              Request a Platform →
+            </a>
+          </div>
+        </section>
+
+        {/* SECTION: Advanced Player Technology (iTeraPlay Tech Architecture) */}
+        <section className="p-8 sm:p-12 md:p-14 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+            
+            {/* Left Column: Tech Features */}
+            <div className="lg:col-span-7 space-y-6">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-950 dark:text-white tracking-tight">
+                Advanced Player Technology
+              </h2>
+              <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+                Experience the power of our cutting-edge cloud video streaming technology. OnlinePlayer connects directly to high-speed media streams to ensure seamless connectivity, adaptive resolution, and uninterrupted video playback.
+              </p>
+
+              <div className="space-y-4 pt-2">
+                {/* Feature 1 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 shrink-0"></div>
+                  <div>
+                    <h4 className="text-base font-bold text-zinc-950 dark:text-white">
+                      Smart Link Processing
+                    </h4>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mt-0.5">
+                      Automatically detects and extracts playable streams from cloud links with 99.9% accuracy.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature 2 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 shrink-0"></div>
+                  <div>
+                    <h4 className="text-base font-bold text-zinc-950 dark:text-white">
+                      Multi-Server Edge Network
+                    </h4>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mt-0.5">
+                      Leverages distributed high-speed nodes to ensure continuous, uninterrupted streaming.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature 3 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 shrink-0"></div>
+                  <div>
+                    <h4 className="text-base font-bold text-zinc-950 dark:text-white">
+                      Adaptive Quality
+                    </h4>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mt-0.5">
+                      Dynamically optimizes playback from 360p up to crisp 1080p based on your internet connection speed.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature 4 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 shrink-0"></div>
+                  <div>
+                    <h4 className="text-base font-bold text-zinc-950 dark:text-white">
+                      Zero Buffering & No Cutoffs
+                    </h4>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mt-0.5">
+                      Advanced streaming pipeline bypasses 30-second preview limitations and eliminates buffering lag.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature 5 */}
+                <div className="flex items-start gap-3.5">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
+                  <div>
+                    <h4 className="text-base font-bold text-zinc-950 dark:text-white flex items-center gap-2">
+                      <span>100% Free & No Login Required</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        Zero Accounts
+                      </span>
+                    </h4>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mt-0.5">
+                      No registration walls, no login passwords, and no user tracking. Enjoy private and anonymous access without storing any personal data.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Why We Stand Out Stats Cards */}
+            <div className="lg:col-span-5 p-7 sm:p-9 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] space-y-4 sm:space-y-5">
+              <h3 className="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white">
+                Why We Stand Out
+              </h3>
+
+              {/* Stat 1 */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#181822] border border-zinc-200 dark:border-[#262638] space-y-1.5 shadow-2xs">
+                <div className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                  Processing Speed
+                </div>
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-3xl sm:text-4xl font-black text-zinc-950 dark:text-white tracking-tight">
+                    3x
+                  </span>
+                  <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+                    Faster than competitors
+                  </span>
+                </div>
+              </div>
+
+              {/* Stat 2 */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#181822] border border-zinc-200 dark:border-[#262638] space-y-1.5 shadow-2xs">
+                <div className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                  Uptime & Reliability
+                </div>
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-3xl sm:text-4xl font-black text-zinc-950 dark:text-white tracking-tight">
+                    99.9%
+                  </span>
+                  <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+                    Reliable continuous access
+                  </span>
+                </div>
+              </div>
+
+              {/* Stat 3 */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#181822] border border-zinc-200 dark:border-[#262638] space-y-1.5 shadow-2xs">
+                <div className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                  Privacy & Data Safety
+                </div>
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-3xl sm:text-4xl font-black text-zinc-950 dark:text-white tracking-tight">
+                    100%
+                  </span>
+                  <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+                    No login, zero data storage
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
 
         {/* SECTION 1: How to Use the Online Player */}
         <section id="how-it-works" className="p-8 sm:p-12 md:p-16 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl text-center space-y-10">
@@ -295,7 +772,7 @@ export default function Home() {
                   Find & Copy
                 </h4>
                 <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Find your video on TeraBox, Instagram, DiskPlayer, or direct cloud link and copy its URL.
+                  Find your video on TeraBox, Instagram, DiskWala, or direct cloud link and copy its URL.
                 </p>
               </div>
 
@@ -355,7 +832,7 @@ export default function Home() {
                 Multi-Cloud Support
               </h4>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Stream videos from TeraBox, Instagram, DiskPlayer, and direct HLS streams in one single place.
+                Stream videos from TeraBox, Instagram, DiskWala, and direct HLS streams in one single place.
               </p>
             </div>
 
@@ -525,6 +1002,49 @@ export default function Home() {
                 Full power with keyboard shortcuts (Space, seek, volume, F for fullscreen) and uncapped download speeds.
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* SECTION 5: Common Questions (iTeraPlay Style Accordion) */}
+        <section id="faq" className="p-8 sm:p-12 md:p-16 rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl space-y-10 scroll-mt-24">
+          <div className="space-y-3 text-center max-w-3xl mx-auto">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-950 dark:text-white tracking-tight">
+              Common Questions
+            </h2>
+            <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium">
+              Quick answers to help you get started with OnlinePlayer.
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto space-y-3.5">
+            {FAQ_ITEMS.map((faq, idx) => {
+              const isOpen = openFaqIndex === idx;
+              return (
+                <div
+                  key={idx}
+                  className="rounded-2xl bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] transition-colors overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                    className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 font-bold text-base sm:text-lg text-zinc-950 dark:text-white cursor-pointer select-none transition-colors hover:text-blue-500"
+                  >
+                    <span>{faq.question}</span>
+                    <ChevronDown
+                      className={`h-5 w-5 text-zinc-400 shrink-0 transition-transform duration-200 ${
+                        isOpen ? "rotate-180 text-blue-500" : ""
+                      }`}
+                      strokeWidth={2.4}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-5 sm:px-6 sm:pb-6 text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed border-t border-zinc-200/60 dark:border-[#222230] pt-3">
+                      {faq.answer}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 

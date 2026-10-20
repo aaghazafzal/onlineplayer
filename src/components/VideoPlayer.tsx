@@ -147,6 +147,39 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [activeUrl, streamData.surl]);
 
+  // Listen for fullscreen change (including ESC key, swipe down, Android back gesture)
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const isFs = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFs);
+
+      if (!isFs) {
+        try {
+          if (screen.orientation && (screen.orientation as any).unlock) {
+            (screen.orientation as any).unlock();
+          }
+        } catch (e) {}
+      }
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+    document.addEventListener("mozfullscreenchange", onFullscreenChange);
+    document.addEventListener("MSFullscreenChange", onFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", onFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", onFullscreenChange);
+    };
+  }, []);
+
   // Video time & buffer tracking
   const handleTimeUpdate = () => {
     const video = videoRef.current;
@@ -222,17 +255,74 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  // Fullscreen toggle
+  // Fullscreen toggle with mobile auto-rotate & orientation lock
   const toggleFullscreen = async () => {
     const container = playerContainerRef.current;
-    if (!container) return;
+    const video = videoRef.current;
+    if (!container || !video) return;
 
-    if (!document.fullscreenElement) {
-      await container.requestFullscreen().catch(console.error);
-      setIsFullscreen(true);
+    // iOS Safari native fullscreen support
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    if (isIOS && (video as any).webkitEnterFullscreen) {
+      try {
+        (video as any).webkitEnterFullscreen();
+        return;
+      } catch (e) {
+        console.warn("iOS native fullscreen error:", e);
+      }
+    }
+
+    const isCurrentlyFullscreen = Boolean(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    );
+
+    if (!isCurrentlyFullscreen) {
+      try {
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        } else if ((container as any).mozRequestFullScreen) {
+          await (container as any).mozRequestFullScreen();
+        } else if ((container as any).msRequestFullscreen) {
+          await (container as any).msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+
+        // Auto-rotate to landscape on mobile / tablet screens
+        try {
+          if (screen.orientation && (screen.orientation as any).lock) {
+            await (screen.orientation as any).lock("landscape").catch(() => {});
+          }
+        } catch (orientErr) {
+          console.warn("Screen orientation lock:", orientErr);
+        }
+      } catch (err) {
+        console.error("Fullscreen error:", err);
+      }
     } else {
-      await document.exitFullscreen().catch(console.error);
-      setIsFullscreen(false);
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+        setIsFullscreen(false);
+        try {
+          if (screen.orientation && (screen.orientation as any).unlock) {
+            (screen.orientation as any).unlock();
+          }
+        } catch (e) {}
+      } catch (err) {
+        console.error("Exit fullscreen error:", err);
+      }
     }
   };
 
@@ -354,12 +444,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ref={playerContainerRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      className={`relative w-full rounded-3xl overflow-hidden bg-black shadow-2xl transition-all duration-300 border border-zinc-800 ${
-        isTheaterMode ? "max-w-[1500px] mx-auto" : "max-w-[1360px] mx-auto"
+      className={`relative w-full bg-black transition-all duration-300 ${
+        isFullscreen
+          ? "fixed inset-0 h-screen w-screen max-w-none rounded-none border-none z-[99999]"
+          : `rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 ${
+              isTheaterMode ? "max-w-[1500px] mx-auto" : "max-w-[1360px] mx-auto"
+            }`
       }`}
     >
-      {/* 16:9 Video Aspect Container */}
-      <div className="relative aspect-video w-full bg-black flex items-center justify-center">
+      {/* Video Container (full viewport in fullscreen, 16:9 aspect-video when normal) */}
+      <div
+        className={`relative w-full bg-black flex items-center justify-center ${
+          isFullscreen ? "h-full" : "aspect-video"
+        }`}
+      >
         <video
           ref={videoRef}
           onTimeUpdate={handleTimeUpdate}
@@ -390,7 +488,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         {/* Controls Overlay */}
         <div
-          className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/60 to-transparent pt-12 pb-3 px-4 transition-opacity duration-300 ${
+          className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/60 to-transparent pt-12 ${
+            isFullscreen ? "pb-6 px-6 sm:px-10" : "pb-3 px-4"
+          } transition-opacity duration-300 ${
             showControls ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >

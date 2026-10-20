@@ -31,6 +31,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (path.includes("terabox-videos")) {
+        setActiveItem("terabox-videos");
+      } else if (window.location.hash === "#providers" || window.location.hash === "#features") {
+        setActiveItem("providers");
+      } else if (window.location.hash === "#how-it-works") {
+        setActiveItem("guide");
+      } else {
+        setActiveItem("home");
+      }
+    }
   }, []);
 
   // Lock body scroll when sidebar drawer is open
@@ -96,9 +108,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
               <span>Home</span>
             </a>
 
+            {/* TeraBox Videos */}
+            <a
+              href="/terabox-videos"
+              onClick={() => setActiveItem("terabox-videos")}
+              className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                activeItem === "terabox-videos"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1e1e2c]"
+              }`}
+            >
+              <PlayCircle className="h-4 w-4" strokeWidth={2.4} />
+              <span>TeraBox Videos</span>
+            </a>
+
             {/* Providers */}
             <a
-              href="#features"
+              href="/#providers"
               onClick={() => setActiveItem("providers")}
               className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeItem === "providers"
@@ -112,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
 
             {/* How To Use */}
             <a
-              href="#how-it-works"
+              href="/#how-it-works"
               onClick={() => setActiveItem("guide")}
               className={`flex items-center gap-2.5 px-4.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeItem === "guide"
@@ -126,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
 
             {/* API */}
             <a
-              href="https://terabox-player-api.onlineplayer.workers.dev"
+              href="https://terabox.onlineplayer.site"
               target="_blank"
               rel="noreferrer"
               onClick={() => setActiveItem("api")}
@@ -276,9 +302,26 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
                   <span>Home</span>
                 </a>
 
+                {/* TeraBox Videos */}
+                <a
+                  href="/terabox-videos"
+                  onClick={() => {
+                    setActiveItem("terabox-videos");
+                    setSidebarOpen(false);
+                  }}
+                  className={`flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                    activeItem === "terabox-videos"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                      : "text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#181820]"
+                  }`}
+                >
+                  <PlayCircle className="h-4.5 w-4.5" strokeWidth={2.4} />
+                  <span>TeraBox Videos</span>
+                </a>
+
                 {/* API */}
                 <a
-                  href="https://terabox-player-api.onlineplayer.workers.dev"
+                  href="https://terabox.onlineplayer.site"
                   target="_blank"
                   rel="noreferrer"
                   onClick={() => {
@@ -297,7 +340,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
 
                 {/* Providers */}
                 <a
-                  href="#features"
+                  href="/#providers"
                   onClick={() => {
                     setActiveItem("providers");
                     setSidebarOpen(false);
