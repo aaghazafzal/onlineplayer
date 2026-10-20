@@ -80,27 +80,81 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
             </a>
           </div>
 
-          {/* Right: Engine Status + Shortcuts + Theme Toggle Capsule */}
-          <div className="flex items-center gap-2.5 sm:gap-4">
-            
-            {/* Cloud Status Pill (Laptop) */}
-            <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] text-xs font-semibold text-zinc-700 dark:text-zinc-300 shadow-xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="font-bold text-zinc-900 dark:text-white">Universal Cloud Engine</span>
-            </div>
+          {/* Center: Desktop Floating Pill Navigation (IteraPlay style) */}
+          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-full bg-white dark:bg-[#15151c] border border-zinc-200/90 dark:border-[#272736] shadow-sm">
+            {/* Home */}
+            <a
+              href="/"
+              onClick={() => setActiveItem("home")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeItem === "home"
+                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+              }`}
+            >
+              <HomeIcon className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <span>Home</span>
+            </a>
 
-            {/* Keyboard Shortcuts Button */}
+            {/* Providers */}
+            <a
+              href="#features"
+              onClick={() => setActiveItem("providers")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeItem === "providers"
+                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+              }`}
+            >
+              <Film className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <span>Providers</span>
+            </a>
+
+            {/* How To Use */}
+            <a
+              href="#how-it-works"
+              onClick={() => setActiveItem("guide")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeItem === "guide"
+                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <span>How To Use</span>
+            </a>
+
+            {/* API */}
+            <a
+              href="https://terabox-player-api.onlineplayer.workers.dev"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setActiveItem("api")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeItem === "api"
+                  ? "bg-zinc-200/80 dark:bg-[#2a2a38] text-zinc-950 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1f1f2a]"
+              }`}
+            >
+              <Code2 className="h-3.5 w-3.5" strokeWidth={2.4} />
+              <span>API</span>
+            </a>
+          </nav>
+
+          {/* Right: Shortcuts + Theme Toggle Capsule */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Bold Keyboard Shortcuts Button */}
             {onOpenShortcuts && (
               <button
                 onClick={onOpenShortcuts}
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-[#18181f] hover:bg-zinc-100 dark:hover:bg-[#20202a] border border-zinc-200 dark:border-[#272733] transition-colors cursor-pointer"
+                className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold text-zinc-800 dark:text-zinc-200 bg-white dark:bg-[#181820] hover:bg-zinc-100 dark:hover:bg-[#22222e] border border-zinc-300 dark:border-[#2b2b3a] shadow-xs hover:border-blue-500 dark:hover:border-blue-500 transition-all cursor-pointer active:scale-95"
                 title="Keyboard Shortcuts"
               >
-                <Keyboard className="h-4 w-4 text-blue-500" strokeWidth={2.3} />
+                <Keyboard className="h-4 w-4 text-blue-500" strokeWidth={2.4} />
                 <span>Shortcuts</span>
+                <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-black rounded bg-zinc-100 dark:bg-[#262636] text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-[#353548]">
+                  ?
+                </kbd>
               </button>
             )}
 
@@ -241,21 +295,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenShortcuts }) => {
                   <span>API</span>
                 </a>
 
-                {/* Cloud Videos */}
+                {/* Providers */}
                 <a
                   href="#features"
                   onClick={() => {
-                    setActiveItem("videos");
+                    setActiveItem("providers");
                     setSidebarOpen(false);
                   }}
                   className={`flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                    activeItem === "videos"
+                    activeItem === "providers"
                       ? "bg-blue-600/15 text-blue-500 dark:text-blue-400 border border-blue-500/30 font-bold"
                       : "text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#181820]"
                   }`}
                 >
-                  <PlayCircle className="h-4.5 w-4.5" strokeWidth={2.4} />
-                  <span>Cloud Videos</span>
+                  <Film className="h-4.5 w-4.5" strokeWidth={2.4} />
+                  <span>Providers</span>
                 </a>
 
                 {/* Telegram Bot / Community */}
