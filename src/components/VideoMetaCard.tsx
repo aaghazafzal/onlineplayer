@@ -130,7 +130,7 @@ export const VideoMetaCard: React.FC<VideoMetaCardProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
                 <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2.5} />
-                Full 1080p / 720p Stream
+                {streamUrl.includes("m3u8") ? "Full 1080p / 720p Stream" : "Original HD Quality"}
               </span>
 
               {isCached && (
@@ -163,7 +163,7 @@ export const VideoMetaCard: React.FC<VideoMetaCardProps> = ({
 
               <div className="flex items-center gap-1.5">
                 <Film className="h-4 w-4 text-zinc-400" strokeWidth={2.3} />
-                <span>HLS Adaptive Stream</span>
+                <span>{streamUrl.includes("m3u8") ? "HLS Adaptive Stream" : "Direct High-Speed Stream"}</span>
               </div>
             </div>
           </div>
@@ -173,7 +173,7 @@ export const VideoMetaCard: React.FC<VideoMetaCardProps> = ({
             <button
               onClick={handleCopy}
               className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-[#121217] hover:bg-zinc-200 dark:hover:bg-[#20202a] border border-zinc-300 dark:border-[#2a2a38] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              title="Copy M3U8 stream URL for VLC"
+              title="Copy stream URL"
             >
               {copied ? (
                 <>

@@ -23,42 +23,153 @@ export async function downloadVideoStream(
   onProgress?: (progress: DownloadProgress) => void,
   abortSignal?: AbortSignal
 ): Promise<void> {
-  // Ensure clean filename ending with .mp4
-  let filename = (rawFilename || "video").trim();
-  if (!filename.toLowerCase().endsWith(".mp4") && !filename.toLowerCase().endsWith(".mkv") && !filename.toLowerCase().endsWith(".ts")) {
-    filename += ".mp4";
+  // Determine if stream is an HLS (M3U8) stream
+  const isHls = streamUrl.toLowerCase().includes(".m3u8") || streamUrl.toLowerCase().includes("m3u8");
+
+  // Determine clean filename and extension
+  let filename = (rawFilename || "media").trim();
+  const hasExt = /\.(mp4|mkv|webm|ts|jpg|jpeg|png|webp)$/i.test(filename);
+  if (!hasExt) {
+    if (streamUrl.includes(".jpg") || streamUrl.includes(".jpeg") || filename.toLowerCase().includes("photo")) {
+      filename += ".jpg";
+    } else if (streamUrl.includes(".png")) {
+      filename += ".png";
+    } else {
+      filename += ".mp4";
+    }
   }
 
-  // 1. Direct Video File (.mp4, .webm, etc.) Bypass
-  const isDirectFile = !streamUrl.includes(".m3u8") && (streamUrl.endsWith(".mp4") || streamUrl.endsWith(".webm") || streamUrl.endsWith(".mkv"));
-  
-  if (isDirectFile) {
+  // 1. Direct Media File (.mp4, proxy stream, image, etc.)
+  if (!isHls) {
     onProgress?.({
-      status: "downloading",
-      percent: 50,
-      downloadedChunks: 1,
+      status: "preparing",
+      percent: 0,
+      downloadedChunks: 0,
       totalChunks: 1,
       downloadedBytes: 0,
       speedMBs: 0,
     });
 
-    const a = document.createElement("a");
-    a.href = streamUrl;
-    a.download = filename;
-    a.target = "_self";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const startTime = Date.now();
+      let lastSpeedCalcTime = startTime;
+      let bytesSinceLastCalc = 0;
+      let currentSpeedMBs = 0;
 
-    onProgress?.({
-      status: "completed",
-      percent: 100,
-      downloadedChunks: 1,
-      totalChunks: 1,
-      downloadedBytes: 0,
-      speedMBs: 0,
-    });
-    return;
+      const res = await fetch(streamUrl, { signal: abortSignal });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch media (${res.status})`);
+      }
+
+      const contentLengthHeader = res.headers.get("content-length");
+      const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+      const contentType = res.headers.get("content-type") || (filename.endsWith(".jpg") ? "image/jpeg" : "video/mp4");
+
+      if (!res.body) {
+        throw new Error("ReadableStream not available");
+      }
+
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let downloadedBytes = 0;
+
+      while (true) {
+        if (abortSignal?.aborted) {
+          throw new Error("Download cancelled");
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (value) {
+          chunks.push(value);
+          downloadedBytes += value.byteLength;
+          bytesSinceLastCalc += value.byteLength;
+
+          const now = Date.now();
+          const elapsed = (now - lastSpeedCalcTime) / 1000;
+          if (elapsed >= 0.3) {
+            currentSpeedMBs = Number(((bytesSinceLastCalc / (1024 * 1024)) / elapsed).toFixed(2));
+            lastSpeedCalcTime = now;
+            bytesSinceLastCalc = 0;
+          }
+
+          const percent = totalBytes > 0 
+            ? Math.min(99, Math.round((downloadedBytes / totalBytes) * 100))
+            : Math.min(95, Math.round(downloadedBytes / (1024 * 1024 * 6)));
+
+          onProgress?.({
+            status: "downloading",
+            percent,
+            downloadedChunks: 1,
+            totalChunks: 1,
+            downloadedBytes,
+            speedMBs: currentSpeedMBs,
+          });
+        }
+      }
+
+      onProgress?.({
+        status: "assembling",
+        percent: 100,
+        downloadedChunks: 1,
+        totalChunks: 1,
+        downloadedBytes,
+        speedMBs: 0,
+      });
+
+      const blob = new Blob(chunks as BlobPart[], { type: contentType });
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+
+      onProgress?.({
+        status: "completed",
+        percent: 100,
+        downloadedChunks: 1,
+        totalChunks: 1,
+        downloadedBytes,
+        speedMBs: 0,
+      });
+      return;
+    } catch (err: any) {
+      if (abortSignal?.aborted || err.message === "Download cancelled") {
+        throw new Error("Download cancelled");
+      }
+
+      console.warn("Direct stream fetch failed, falling back to direct download link:", err);
+
+      let fallbackHref = streamUrl;
+      if (streamUrl.includes("/api/proxy")) {
+        fallbackHref = streamUrl.replace("/api/proxy", "/api/download");
+        if (!fallbackHref.includes("filename=")) {
+          fallbackHref += `&filename=${encodeURIComponent(filename)}`;
+        }
+      }
+
+      const a = document.createElement("a");
+      a.href = fallbackHref;
+      a.download = filename;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      onProgress?.({
+        status: "completed",
+        percent: 100,
+        downloadedChunks: 1,
+        totalChunks: 1,
+        downloadedBytes: 0,
+        speedMBs: 0,
+      });
+      return;
+    }
   }
 
   // 2. HLS Stream Downloader

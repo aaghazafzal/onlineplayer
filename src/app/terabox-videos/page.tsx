@@ -133,10 +133,14 @@ export default function TeraBoxVideosPage() {
       }
 
       if (append) {
-        setVideoList((prev) => [...prev, ...(data.list || [])]);
+        setVideoList((prev) => [
+          ...prev,
+          ...(data.list || []).filter((item: VideoItem) => Boolean(item.surl || item.shareUrl))
+        ]);
       } else {
-        setVideoList(data.list || []);
-        setTotalResults(data.total || 0);
+        const filtered = (data.list || []).filter((item: VideoItem) => Boolean(item.surl || item.shareUrl));
+        setVideoList(filtered);
+        setTotalResults(data.total || filtered.length);
         setActiveQuery(query.trim());
       }
     } catch (err: any) {
@@ -220,7 +224,11 @@ export default function TeraBoxVideosPage() {
 
   // Copy Share Link
   const handleCopyLink = (item: VideoItem) => {
-    const url = item.shareUrl || `https://terabox.com/s/${item.surl}`;
+    const url = item.shareUrl || (item.surl ? `https://terabox.com/s/${item.surl}` : "");
+    if (!url) {
+      setErrorMessage("Share link is not available for this item.");
+      return;
+    }
     navigator.clipboard.writeText(url);
     setCopiedId(item.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -228,9 +236,9 @@ export default function TeraBoxVideosPage() {
 
   // Play video inside In-Page Modal
   const handlePlayModal = async (item: VideoItem) => {
-    if (!item.surl) {
-      // Fallback: Redirect to main page with search
-      window.location.href = `/?search=${encodeURIComponent(item.title)}`;
+    const link = item.shareUrl || (item.surl ? `https://terabox.com/s/${item.surl}` : "");
+    if (!link) {
+      setErrorMessage("Stream link is not available for this video.");
       return;
     }
 
@@ -240,7 +248,7 @@ export default function TeraBoxVideosPage() {
     setModalStreamData(null);
 
     try {
-      const targetApi = `${WORKER_API_BASE}/api/resolve?url=https://terabox.com/s/${item.surl}`;
+      const targetApi = `${WORKER_API_BASE}/api/resolve?url=${encodeURIComponent(link)}`;
       const res = await fetch(targetApi);
       const data = await res.json();
 
@@ -260,7 +268,7 @@ export default function TeraBoxVideosPage() {
         durationFormatted: activeFile.duration_formatted || item.duration,
         sizeFormatted: activeFile.size_formatted || item.size,
         thumbnail: item.thumbnail,
-        surl: item.surl,
+        surl: item.surl || undefined,
       });
     } catch (err: any) {
       console.error("Modal stream resolve error:", err);
@@ -272,8 +280,8 @@ export default function TeraBoxVideosPage() {
 
   // Direct Download Trigger
   const handleDownload = (item: VideoItem) => {
-    if (!item.surl) return;
-    const targetUrl = `https://terabox.com/s/${item.surl}`;
+    const targetUrl = item.shareUrl || (item.surl ? `https://terabox.com/s/${item.surl}` : "");
+    if (!targetUrl) return;
     // Open in main player with auto-download triggered
     window.location.href = `/?url=${encodeURIComponent(targetUrl)}&download=1`;
   };
@@ -640,7 +648,7 @@ export default function TeraBoxVideosPage() {
 
                       {/* 4. Play in Full Player Page */}
                       <a
-                        href={`/?url=${encodeURIComponent(item.shareUrl || `https://terabox.com/s/${item.surl}`)}`}
+                        href={item.shareUrl ? `/?url=${encodeURIComponent(item.shareUrl)}` : item.surl ? `/?url=${encodeURIComponent(`https://terabox.com/s/${item.surl}`)}` : "#"}
                         className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-[#181926] border border-zinc-200 dark:border-[#262738] text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:border-blue-500/40 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0"
                         title="Open in Full OnlinePlayer Page"
                       >

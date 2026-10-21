@@ -20,7 +20,7 @@ interface UrlInputBarProps {
   initialUrl?: string;
 }
 
-export type ProviderTab = "all" | "terabox" | "instagram" | "diskwala" | "direct";
+export type ProviderTab = "all" | "terabox" | "instagram" | "spotify" | "diskwala" | "direct";
 
 export const UrlInputBar: React.FC<UrlInputBarProps> = ({
   onResolve,
@@ -50,6 +50,8 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
       if (activeTab !== "all") setActiveTab("terabox");
     } else if (val.includes("instagram.com") || val.includes("instagr.am")) {
       if (activeTab !== "all") setActiveTab("instagram");
+    } else if (val.includes("spotify.com") || val.includes("spotify.link") || val.startsWith("spotify:track:")) {
+      if (activeTab !== "all") setActiveTab("spotify");
     } else if (val.includes("diskwala") || val.includes("disk") || val.includes("disko")) {
       if (activeTab !== "all") setActiveTab("diskwala");
     } else if (val.endsWith(".m3u8") || val.endsWith(".mp4")) {
@@ -90,6 +92,8 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
         return "Paste your TeraBox link here (1024tera, terabox.app, dubox, nephobox)...";
       case "instagram":
         return "Paste your Instagram Reel or Post video link here...";
+      case "spotify":
+        return "Paste your Spotify Track link here (open.spotify.com/track/...)...";
       case "diskwala":
         return "Paste your DiskWala link here (diskwala.com)...";
       case "direct":
@@ -147,6 +151,20 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
           >
             <img src="/providers/instagram.png" alt="Instagram" className="h-4 w-4 object-contain" />
             <span>Instagram</span>
+          </button>
+
+          {/* Spotify Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("spotify")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "spotify"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
+                : "bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#242430]"
+            }`}
+          >
+            <img src="/providers/spotify.png" alt="Spotify" className="h-4 w-4 object-contain" />
+            <span>Spotify</span>
           </button>
 
           {/* DiskWala Tab */}

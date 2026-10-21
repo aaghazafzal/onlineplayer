@@ -67,6 +67,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Check if current stream supports multi-quality (e.g. TeraBox with 480p/360p)
+  const hasMultiQuality = Boolean(streamData.streamUrl360);
+
   // Compute active stream url based on quality
   const activeUrl = selectedQuality === "360" && streamData.streamUrl360
     ? streamData.streamUrl360
@@ -596,39 +599,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <button
                   onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                   className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-zinc-300 hover:text-white flex items-center gap-1 font-semibold text-xs"
-                  title="Settings & Quality"
+                  title={hasMultiQuality ? "Settings & Quality" : "Playback Settings"}
                 >
                   <Settings className="h-4 w-4" strokeWidth={2.2} />
-                  <span className="hidden sm:inline">{selectedQuality}p</span>
+                  {hasMultiQuality && <span className="hidden sm:inline">{selectedQuality}p</span>}
                 </button>
 
                 {showSettingsMenu && (
                   <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl bg-zinc-900 border border-zinc-800 p-2 shadow-2xl text-xs space-y-2 z-40">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2">Quality</span>
-                      <div className="mt-1 space-y-0.5">
-                        <button
-                          onClick={() => changeQuality("480")}
-                          className={`w-full px-2 py-1.5 rounded-md text-left flex items-center justify-between ${
-                            selectedQuality === "480" ? "bg-sky-500/20 text-sky-400 font-semibold" : "hover:bg-zinc-800 text-zinc-300"
-                          }`}
-                        >
-                          <span>480p High Definition</span>
-                          {selectedQuality === "480" && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
-                        </button>
-                        <button
-                          onClick={() => changeQuality("360")}
-                          className={`w-full px-2 py-1.5 rounded-md text-left flex items-center justify-between ${
-                            selectedQuality === "360" ? "bg-sky-500/20 text-sky-400 font-semibold" : "hover:bg-zinc-800 text-zinc-300"
-                          }`}
-                        >
-                          <span>360p Fast / Low Data</span>
-                          {selectedQuality === "360" && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
-                        </button>
+                    {hasMultiQuality && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-zinc-400 px-2">Quality</span>
+                        <div className="mt-1 space-y-0.5">
+                          <button
+                            onClick={() => changeQuality("480")}
+                            className={`w-full px-2 py-1.5 rounded-md text-left flex items-center justify-between ${
+                              selectedQuality === "480" ? "bg-sky-500/20 text-sky-400 font-semibold" : "hover:bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            <span>480p High Definition</span>
+                            {selectedQuality === "480" && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
+                          </button>
+                          <button
+                            onClick={() => changeQuality("360")}
+                            className={`w-full px-2 py-1.5 rounded-md text-left flex items-center justify-between ${
+                              selectedQuality === "360" ? "bg-sky-500/20 text-sky-400 font-semibold" : "hover:bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            <span>360p Fast / Low Data</span>
+                            {selectedQuality === "360" && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="border-t border-zinc-800 pt-2">
+                    <div className={hasMultiQuality ? "border-t border-zinc-800 pt-2" : "pt-1"}>
                       <span className="text-[10px] uppercase font-bold text-zinc-400 px-2">Speed</span>
                       <div className="grid grid-cols-3 gap-1 mt-1">
                         {[0.5, 0.75, 1, 1.25, 1.5, 2].map((s) => (
