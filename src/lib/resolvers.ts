@@ -1,0 +1,237 @@
+import type { StreamData } from "../components/VideoPlayer";
+import type { FileItem } from "../components/VideoMetaCard";
+import type { InstagramMediaItem, InstagramPostData } from "../components/InstagramPostViewer";
+import type { SpotifyTrackData } from "../components/AudioPlayer";
+import type { HistoryItem } from "../components/RecentStreams";
+import { ApiError, fetchProviderJson } from "./api";
+
+export type ProviderKind = "direct" | "instagram" | "spotify" | "terabox" | "diskwala";
+
+export type ResolveResult =
+  | { kind: "direct"; stream: StreamData }
+  | { kind: "instagram"; post: InstagramPostData; history: HistoryItem }
+  | { kind: "spotify"; track: SpotifyTrackData; history: HistoryItem }
+  | { kind: "terabox"; files: FileItem[]; stream: StreamData; cached: boolean; history: HistoryItem | null };
+
+const TERABOX_HOST_HINTS = [
+  "terabox", "1024tera", "dubox", "nephobox", "mirrobox", "momerybox",
+  "tibibox", "freeterabox", "terasharelink", "terafileshare",
+];
+
+export function detectProvider(rawUrl: string): ProviderKind | null {
+  const url = rawUrl.trim().toLowerCase();
+  const path = url.split(/[?#]/)[0];
+  if (path.endsWith(".m3u8") || path.endsWith(".mp4")) return "direct";
+  if (url.includes("instagram.com") || url.includes("instagr.am")) return "instagram";
+  if (url.includes("spotify.com") || url.includes("spotify.link") || url.startsWith("spotify:track:")) return "spotify";
+  if (TERABOX_HOST_HINTS.some((h) => url.includes(h)) || url.includes("surl=") || url.includes("/s/1")) return "terabox";
+  if (url.includes("diskwala")) return "diskwala";
+  return null;
+}
+
+const enc = encodeURIComponent;
+
+function resolveDirect(url: string): ResolveResult {
+  const fileName = url.split("/").pop()?.split("?")[0] || "Direct Video Stream";
+  return {
+    kind: "direct",
+    stream: { streamUrl: url, title: fileName, durationFormatted: "Direct Stream", sizeFormatted: "Live Stream" },
+  };
+}
+
+interface InstagramApiMedia {
+  type?: "video" | "photo";
+  stream_url: string;
+  download_url?: string;
+  direct_url?: string;
+  thumbnail?: string;
+  filename?: string;
+}
+
+interface InstagramApiResponse {
+  status?: string;
+  error?: string;
+  shortcode?: string;
+  author?: string;
+  title?: string;
+  media_type?: InstagramPostData["type"];
+  medias?: InstagramApiMedia[];
+}
+
+async function resolveInstagram(url: string): Promise<ResolveResult> {
+  const { status, data } = await fetchProviderJson<InstagramApiResponse>("instagram", `/api/resolve?url=${enc(url)}`);
+  if (status >= 400 || data.status === "error" || data.error) {
+    throw new ApiError(data.error || "Could not resolve this Instagram post. Make sure the account and post are public.", status);
+  }
+
+  const medias = data.medias || [];
+  if (medias.length === 0) throw new ApiError("No playable video or photo was found in this Instagram post.");
+
+  const primary = medias.find((m) => m.type === "video") || medias[0];
+  const isCarousel = medias.length > 1;
+  const title = data.title || (isCarousel ? `Instagram Carousel (${medias.length} Slides)` : `Instagram Video (${data.shortcode || "Reel"})`);
+
+  const post: InstagramPostData = {
+    shortcode: data.shortcode,
+    author: data.author,
+    title,
+    type: data.media_type || (isCarousel ? "carousel" : primary.type),
+    medias: medias.map(
+      (m, idx): InstagramMediaItem => ({
+        type: m.type || "video",
+        stream_url: m.stream_url,
+        download_url: m.download_url,
+        direct_url: m.direct_url,
+        thumbnail: m.thumbnail || "",
+        filename: m.filename || `instagram-${data.shortcode || "media"}-${idx + 1}.${m.type === "photo" ? "jpg" : "mp4"}`,
+      })
+    ),
+  };
+
+  return {
+    kind: "instagram",
+    post,
+    history: {
+      surl: data.shortcode || url,
+      originalUrl: url,
+      title,
+      durationFormatted: isCarousel ? `${medias.length} Slides` : "Instagram Video",
+      sizeFormatted: primary.type === "photo" ? "HD Photo" : "HD MP4",
+      thumbnail: primary.thumbnail || "",
+      streamUrl: primary.stream_url,
+      playedAt: Date.now(),
+    },
+  };
+}
+
+type SpotifyApiResponse = Partial<SpotifyTrackData> & { error?: string };
+
+async function resolveSpotify(url: string): Promise<ResolveResult> {
+  const { status, data } = await fetchProviderJson<SpotifyApiResponse>("spotify", `/api/resolve?url=${enc(url)}`);
+  if (status >= 400 || !data.ok || !data.streamUrl) {
+    throw new ApiError(data.error || "Could not resolve this Spotify track. Please check that the link is a public track.", status);
+  }
+
+  const track: SpotifyTrackData = {
+    ok: true,
+    provider: "spotify",
+    type: "track",
+    trackId: data.trackId || "",
+    title: data.title || "Unknown Track",
+    artist: data.artist || "",
+    album: data.album || "",
+    year: data.year,
+    duration: data.duration || 0,
+    durationFormatted: data.durationFormatted || "",
+    cover: data.cover || "",
+    streamUrl: data.streamUrl,
+    directStreamUrl: data.directStreamUrl || data.streamUrl,
+    streams: data.streams || [],
+    previewUrl: data.previewUrl ?? null,
+    isFullLength: Boolean(data.isFullLength),
+    match: data.match ?? null,
+    spotifyUrl: data.spotifyUrl || url,
+  };
+
+  return {
+    kind: "spotify",
+    track,
+    history: {
+      surl: track.trackId || url,
+      originalUrl: url,
+      title: track.artist ? `${track.artist} - ${track.title}` : track.title,
+      durationFormatted: track.durationFormatted || "Spotify Track",
+      sizeFormatted: track.isFullLength ? (track.streams[0]?.bitrate === "320k" ? "320 kbps AAC" : "160 kbps AAC") : "30s Preview",
+      thumbnail: track.cover || "/providers/spotify.png",
+      streamUrl: track.streamUrl,
+      playedAt: Date.now(),
+    },
+  };
+}
+
+interface TeraboxApiFile {
+  fs_id: string;
+  filename?: string;
+  size_formatted?: string;
+  duration_formatted?: string;
+  thumbnail?: string;
+  stream_url: string;
+  stream_url_360?: string;
+}
+
+interface TeraboxApiResponse {
+  ok?: boolean;
+  error?: string;
+  surl?: string;
+  cached?: boolean;
+  files?: TeraboxApiFile[];
+}
+
+async function resolveTerabox(url: string): Promise<ResolveResult> {
+  const { status, data } = await fetchProviderJson<TeraboxApiResponse>("terabox", `/api/resolve?url=${enc(url)}`);
+  if (status >= 400 || data.error || !data.ok) {
+    throw new ApiError(data.error || "Could not resolve a stream from this link. It may be private, expired or invalid.", status);
+  }
+  if (!data.files?.length) throw new ApiError("No playable video files were found in this share link.");
+
+  const files: FileItem[] = data.files.map((f) => ({
+    fs_id: f.fs_id,
+    filename: f.filename || "Video.mp4",
+    size_formatted: f.size_formatted || "Unknown",
+    duration_formatted: f.duration_formatted || "",
+    thumbnail: f.thumbnail || "",
+    stream_url: f.stream_url,
+    stream_url_360: f.stream_url_360,
+  }));
+  const first = files[0];
+
+  return {
+    kind: "terabox",
+    files,
+    cached: Boolean(data.cached),
+    stream: {
+      streamUrl: first.stream_url,
+      streamUrl360: first.stream_url_360,
+      title: first.filename,
+      durationFormatted: first.duration_formatted,
+      sizeFormatted: first.size_formatted,
+      thumbnail: first.thumbnail,
+      surl: data.surl,
+    },
+    history: data.surl
+      ? {
+          surl: data.surl,
+          originalUrl: url,
+          title: first.filename,
+          durationFormatted: first.duration_formatted,
+          sizeFormatted: first.size_formatted,
+          thumbnail: first.thumbnail,
+          streamUrl: first.stream_url,
+          playedAt: Date.now(),
+        }
+      : null,
+  };
+}
+
+/** Resolve any supported link into playable data. Throws ApiError with a user-facing message. */
+export async function resolveLink(rawUrl: string): Promise<ResolveResult> {
+  const url = rawUrl.trim();
+  switch (detectProvider(url)) {
+    case "direct":
+      return resolveDirect(url);
+    case "instagram":
+      return resolveInstagram(url);
+    case "spotify":
+      return resolveSpotify(url);
+    case "terabox":
+      return resolveTerabox(url);
+    case "diskwala":
+      throw new ApiError(
+        "DiskWala support is coming in the next update. TeraBox, Instagram and Spotify links work right now."
+      );
+    default:
+      throw new ApiError(
+        "This link is not supported yet. Currently TeraBox, Instagram, Spotify and direct .mp4/.m3u8 links are supported."
+      );
+  }
+}

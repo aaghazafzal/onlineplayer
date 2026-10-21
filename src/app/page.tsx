@@ -5,8 +5,11 @@ import { Navbar } from "../components/Navbar";
 import { UrlInputBar } from "../components/UrlInputBar";
 import { VideoPlayer, StreamData } from "../components/VideoPlayer";
 import { VideoMetaCard, FileItem } from "../components/VideoMetaCard";
+import { InstagramPostViewer, InstagramPostData } from "../components/InstagramPostViewer";
+import { AudioPlayer, SpotifyTrackData } from "../components/AudioPlayer";
 import { RecentStreams, HistoryItem } from "../components/RecentStreams";
 import { ShortcutsModal } from "../components/ShortcutsModal";
+import { resolveLink } from "../lib/resolvers";
 import { 
   AlertCircle, 
   Film, 
@@ -21,15 +24,13 @@ import {
   Monitor, 
   Lock, 
   Check, 
-  Rocket,
-  CheckCircle2,
-  ArrowRight,
-  Sparkles,
-  ChevronDown
+  Rocket, 
+  CheckCircle2, 
+  ArrowRight, 
+  Sparkles, 
+  ChevronDown,
+  Music
 } from "lucide-react";
-
-const WORKER_API_BASE = "https://terabox.onlineplayer.site";
-const INSTAGRAM_WORKER_API_BASE = "https://instagram.onlineplayer.site";
 
 const FAQ_ITEMS = [
   {
@@ -70,6 +71,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [streamData, setStreamData] = useState<StreamData | null>(null);
+  const [instagramData, setInstagramData] = useState<InstagramPostData | null>(null);
+  const [spotifyData, setSpotifyData] = useState<SpotifyTrackData | null>(null);
   const [filesList, setFilesList] = useState<FileItem[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [isCachedHit, setIsCachedHit] = useState(false);
@@ -101,221 +104,79 @@ export default function Home() {
     }
   }, []);
 
+  // Functional updates: handleResolve can run from the mount effect, before the
+  // loaded history has reached this render's closure.
+  const persistHistory = (update: (prev: HistoryItem[]) => HistoryItem[]) => {
+    setHistoryItems((prev) => {
+      const updated = update(prev);
+      try {
+        localStorage.setItem("onlineplayer_history", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Failed to save history:", e);
+      }
+      return updated;
+    });
+  };
+
   const saveToHistory = (item: HistoryItem) => {
-    try {
-      const updated = [item, ...historyItems.filter((h) => h.surl !== item.surl)].slice(0, 12);
-      setHistoryItems(updated);
-      localStorage.setItem("onlineplayer_history", JSON.stringify(updated));
-    } catch (e) {
-      console.warn("Failed to save history:", e);
-    }
+    persistHistory((prev) => [item, ...prev.filter((h) => h.surl !== item.surl)].slice(0, 12));
   };
 
   const handleClearHistory = () => {
     setHistoryItems([]);
-    localStorage.removeItem("onlineplayer_history");
-    localStorage.removeItem("omni_history");
+    try {
+      localStorage.removeItem("onlineplayer_history");
+      localStorage.removeItem("omni_history");
+    } catch {
+      // storage unavailable
+    }
   };
 
   const handleRemoveHistoryItem = (surl: string) => {
-    const updated = historyItems.filter((h) => h.surl !== surl);
-    setHistoryItems(updated);
-    localStorage.setItem("onlineplayer_history", JSON.stringify(updated));
+    persistHistory((prev) => prev.filter((h) => h.surl !== surl));
   };
 
   const handleResolve = async (url: string, autoDownload = false) => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    // Direct HLS / MP4 link bypass
-    if (url.endsWith(".m3u8") || url.endsWith(".mp4")) {
-      const fileName = url.split("/").pop()?.split("?")[0] || "Direct Video Stream";
-      const newStream: StreamData = {
-        streamUrl: url,
-        title: fileName,
-        durationFormatted: "Direct Stream",
-        sizeFormatted: "Live Stream",
-      };
-      setStreamData(newStream);
+    try {
+      const result = await resolveLink(url);
+
+      setStreamData(null);
+      setInstagramData(null);
+      setSpotifyData(null);
       setFilesList([]);
       setCurrentFileIndex(0);
-      setIsLoading(false);
+      setIsCachedHit(false);
+
+      switch (result.kind) {
+        case "direct":
+          setStreamData(result.stream);
+          break;
+        case "instagram":
+          setInstagramData(result.post);
+          saveToHistory(result.history);
+          break;
+        case "spotify":
+          setSpotifyData(result.track);
+          saveToHistory(result.history);
+          break;
+        case "terabox":
+          setFilesList(result.files);
+          setStreamData(result.stream);
+          setIsCachedHit(result.cached);
+          if (result.history) saveToHistory(result.history);
+          break;
+      }
+
       setAutoStartDownload(autoDownload);
-
       setTimeout(() => {
         document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
       }, 150);
-      return;
-    }
-
-    // Provider check & validation
-    const lowerUrl = url.trim().toLowerCase();
-    const isTeraBox = (
-      lowerUrl.includes("terabox") ||
-      lowerUrl.includes("1024tera") ||
-      lowerUrl.includes("1024terabox") ||
-      lowerUrl.includes("dubox") ||
-      lowerUrl.includes("nephobox") ||
-      lowerUrl.includes("mirrobox") ||
-      lowerUrl.includes("momerybox") ||
-      lowerUrl.includes("tibibox") ||
-      lowerUrl.includes("freeterabox") ||
-      lowerUrl.includes("terasharelink") ||
-      lowerUrl.includes("terafileshare") ||
-      lowerUrl.includes("surl=") ||
-      lowerUrl.includes("/s/1")
-    );
-    const isInstagram = (
-      lowerUrl.includes("instagram.com") ||
-      lowerUrl.includes("instagr.am")
-    );
-
-    // Instagram Reel / Video Resolver
-    if (isInstagram) {
-      try {
-        const targetApi = `${INSTAGRAM_WORKER_API_BASE}/api/resolve?url=${encodeURIComponent(url)}`;
-        const res = await fetch(targetApi);
-        const data = await res.json();
-
-        if (!res.ok || data.status === "error" || data.error) {
-          throw new Error(data.error || "Could not resolve Instagram video. Please make sure the account or post is public.");
-        }
-
-        const medias = data.medias || [];
-        if (medias.length === 0) {
-          throw new Error("No playable video or media found for this Instagram link.");
-        }
-
-        const primary = medias.find((m: any) => m.type === "video") || medias[0];
-        const title = data.title || `Instagram Video (${data.shortcode || "Reel"})`;
-
-        const newStream: StreamData = {
-          streamUrl: primary.stream_url,
-          title: title,
-          durationFormatted: "Instagram Video",
-          sizeFormatted: primary.type === "video" ? "HD MP4" : "Photo",
-          thumbnail: primary.thumbnail,
-          surl: data.shortcode,
-        };
-
-        setStreamData(newStream);
-
-        if (medias.length > 1) {
-          const items: FileItem[] = medias.map((m: any, idx: number) => ({
-            fs_id: `ig-${data.shortcode}-${idx}`,
-            filename: m.filename || `Instagram Media ${idx + 1}.${m.type === "video" ? "mp4" : "jpg"}`,
-            size_formatted: m.type === "video" ? "HD Video" : "Photo",
-            duration_formatted: m.type === "video" ? "Instagram Video" : "Photo",
-            thumbnail: m.thumbnail || "",
-            stream_url: m.stream_url,
-          }));
-          setFilesList(items);
-        } else {
-          setFilesList([]);
-        }
-
-        setCurrentFileIndex(0);
-        saveToHistory({
-          surl: data.shortcode || url,
-          originalUrl: url,
-          title: title,
-          durationFormatted: "Instagram Video",
-          sizeFormatted: primary.type === "video" ? "HD MP4" : "Photo",
-          thumbnail: primary.thumbnail || "",
-          streamUrl: primary.stream_url,
-          playedAt: Date.now(),
-        });
-
-        setIsLoading(false);
-        setAutoStartDownload(autoDownload);
-
-        setTimeout(() => {
-          document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
-        }, 150);
-        return;
-      } catch (igErr: any) {
-        setIsLoading(false);
-        setErrorMessage(igErr.message || "Failed to resolve Instagram video. Please make sure the post is public and active.");
-        return;
-      }
-    }
-
-    if (!isTeraBox) {
-      setIsLoading(false);
-      if (lowerUrl.includes("diskwala") || lowerUrl.includes("disk")) {
-        setErrorMessage("DiskWala cloud extractor will be activated in the next update! Currently, TeraBox and Instagram are fully active. Explore the Supported Platforms section below.");
-        return;
-      }
-      setErrorMessage("This provider is not supported yet. Currently, TeraBox, Instagram, and Direct Streams are supported. Check the Supported Platforms section below.");
-      return;
-    }
-
-    try {
-      const targetApi = `${WORKER_API_BASE}/api/resolve?url=${encodeURIComponent(url)}`;
-      const res = await fetch(targetApi);
-      const data = await res.json();
-
-      if (!res.ok || data.error || !data.ok) {
-        throw new Error(data.error || "Could not resolve stream from link. The link may be private or invalid.");
-      }
-
-      if (!data.files || data.files.length === 0) {
-        throw new Error("No playable video files found in this share link.");
-      }
-
-      const files: FileItem[] = data.files.map((f: any) => ({
-        fs_id: f.fs_id,
-        filename: f.filename || "Video.mp4",
-        size_formatted: f.size_formatted || "Unknown",
-        duration_formatted: f.duration_formatted || "",
-        thumbnail: f.thumbnail || "",
-        stream_url: f.stream_url,
-        stream_url_360: f.stream_url_360,
-      }));
-
-      const activeFile = files[0];
-      const newStream: StreamData = {
-        streamUrl: activeFile.stream_url,
-        streamUrl360: activeFile.stream_url_360,
-        title: activeFile.filename,
-        durationFormatted: activeFile.duration_formatted,
-        sizeFormatted: activeFile.size_formatted,
-        thumbnail: activeFile.thumbnail,
-        surl: data.surl,
-      };
-
-      setFilesList(files);
-      setCurrentFileIndex(0);
-      setStreamData(newStream);
-      setIsCachedHit(Boolean(data.cached));
-
-      // Save to history
-      if (data.surl) {
-        saveToHistory({
-          surl: data.surl,
-          originalUrl: url,
-          title: activeFile.filename,
-          durationFormatted: activeFile.duration_formatted,
-          sizeFormatted: activeFile.size_formatted,
-          thumbnail: activeFile.thumbnail,
-          streamUrl: activeFile.stream_url,
-          playedAt: Date.now(),
-        });
-      }
-
-      if (autoDownload) {
-        setAutoStartDownload(true);
-      } else {
-        setAutoStartDownload(false);
-      }
-
-      setTimeout(() => {
-        document.getElementById("player-container")?.scrollIntoView({ behavior: "smooth" });
-      }, 150);
-
-    } catch (err: any) {
+    } catch (err) {
       console.error("Resolve error:", err);
-      setErrorMessage(err.message || "An unexpected error occurred while resolving video.");
+      setErrorMessage(err instanceof Error && err.message ? err.message : "An unexpected error occurred while resolving this link.");
     } finally {
       setIsLoading(false);
     }
@@ -360,7 +221,7 @@ export default function Home() {
           </h1>
 
           <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium max-w-3xl mx-auto leading-relaxed">
-            Stream and download TeraBox, Instagram, DiskWala, and direct cloud links instantly with zero limits & no ads.
+            Stream and download TeraBox, Instagram, Spotify, DiskWala, and direct cloud links instantly with zero limits &amp; no ads.
           </p>
         </div>
 
@@ -388,26 +249,40 @@ export default function Home() {
           </div>
         )}
 
-        {/* Active Player Section (Appears when video is loaded) */}
-        {streamData && (
+        {/* Active Player Section (Appears when video, Instagram post or Spotify track is loaded) */}
+        {(streamData || instagramData || spotifyData) && (
           <div id="player-container" className="space-y-8 pt-4 scroll-mt-24">
-            <VideoPlayer
-              streamData={streamData}
-              isTheaterMode={isTheaterMode}
-              onToggleTheater={() => setIsTheaterMode(!isTheaterMode)}
-            />
+            {spotifyData ? (
+              <AudioPlayer
+                trackData={spotifyData}
+                autoStartDownload={autoStartDownload}
+              />
+            ) : instagramData ? (
+              <InstagramPostViewer
+                postData={instagramData}
+                autoStartDownload={autoStartDownload}
+              />
+            ) : streamData ? (
+              <>
+                <VideoPlayer
+                  streamData={streamData}
+                  isTheaterMode={isTheaterMode}
+                  onToggleTheater={() => setIsTheaterMode(!isTheaterMode)}
+                />
 
-            <VideoMetaCard
-              title={streamData.title}
-              durationFormatted={streamData.durationFormatted}
-              sizeFormatted={streamData.sizeFormatted}
-              streamUrl={streamData.streamUrl}
-              files={filesList}
-              currentFileIndex={currentFileIndex}
-              onSelectFile={handleSelectFile}
-              isCached={isCachedHit}
-              autoStartDownload={autoStartDownload}
-            />
+                <VideoMetaCard
+                  title={streamData.title}
+                  durationFormatted={streamData.durationFormatted}
+                  sizeFormatted={streamData.sizeFormatted}
+                  streamUrl={streamData.streamUrl}
+                  files={filesList}
+                  currentFileIndex={currentFileIndex}
+                  onSelectFile={handleSelectFile}
+                  isCached={isCachedHit}
+                  autoStartDownload={autoStartDownload}
+                />
+              </>
+            ) : null}
           </div>
         )}
 
@@ -432,7 +307,7 @@ export default function Home() {
           </div>
 
           {/* Provider Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             
             {/* CARD 1: TeraBox */}
             <div className="group relative p-7 sm:p-8 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300 flex flex-col justify-between shadow-xs hover:shadow-xl">
@@ -574,7 +449,77 @@ export default function Home() {
               </div>
             </div>
 
-            {/* CARD 3: DiskWala */}
+            {/* CARD 3: Spotify */}
+            <div className="group relative p-7 sm:p-8 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] hover:border-[#1DB954]/50 dark:hover:border-[#1DB954]/50 transition-all duration-300 flex flex-col justify-between shadow-xs hover:shadow-xl">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <img 
+                    src="/providers/spotify.png" 
+                    alt="Spotify Logo" 
+                    className="h-12 w-auto sm:h-14 object-contain group-hover:scale-105 transition-transform"
+                  />
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-[#181822] text-zinc-800 dark:text-zinc-200 border border-zinc-300/80 dark:border-[#28283a]">
+                    <span className="h-2 w-2 rounded-full bg-[#1DB954]"></span>
+                    Live & Bypassed
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white group-hover:text-[#1DB954] transition-colors">
+                    Spotify
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    Tracks, Songs & Cloud Music
+                  </p>
+                </div>
+
+                {/* Feature Checkpoints */}
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-[#1DB954] shrink-0" />
+                    <span>Full-Length 320 kbps AAC Audio</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-[#1DB954] shrink-0" />
+                    <span>100% Full-Length Stream (No 30s Cut)</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-[#1DB954] shrink-0" />
+                    <span>One-Click MP4/M4A Direct Downloader</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-[#1DB954] shrink-0" />
+                    <span>No Spotify Premium / Login Required</span>
+                  </div>
+                </div>
+
+                {/* Supported Domains */}
+                <div className="pt-2">
+                  <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Supported Links</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["open.spotify.com/track/", "spotify.link/", "spotify:track:"].map((dom) => (
+                      <span key={dom} className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-zinc-200/70 dark:bg-[#1a1a24] text-zinc-700 dark:text-zinc-300 border border-zinc-300/40 dark:border-[#272737]">
+                        {dom}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-6 mt-6 border-t border-zinc-200/80 dark:border-[#222230]">
+                <button
+                  type="button"
+                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                  className="w-full py-3 px-4 rounded-xl bg-[#1DB954] hover:bg-[#1aa34a] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-[#1DB954]/20 transition-all cursor-pointer"
+                >
+                  <span>Use Spotify Player</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* CARD 4: DiskWala */}
             <div className="group relative p-7 sm:p-8 rounded-[28px] bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633] hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300 flex flex-col justify-between shadow-xs hover:shadow-xl">
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
