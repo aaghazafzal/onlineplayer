@@ -6,7 +6,7 @@ import { SiteFooter } from "../../components/HomeSections";
 import { RevealObserver } from "../../components/RevealObserver";
 import { ShortcutsModal } from "../../components/ShortcutsModal";
 import { VideoPlayer, StreamData } from "../../components/VideoPlayer";
-import { Search, X, Play, Download, Share2, Bookmark, ExternalLink, Check, AlertCircle, RefreshCw } from "lucide-react";
+import { Search, X, Play, Download, Share2, Bookmark, ExternalLink, Check, AlertCircle, RefreshCw, ArrowUp } from "lucide-react";
 
 interface VideoItem {
   id: string | number;
@@ -20,6 +20,8 @@ interface VideoItem {
   surl: string | null;
   shareUrl: string | null;
 }
+
+const FLOAT_SHADOW = "shadow-[0_8px_24px_rgba(0,0,0,0.25)]"; // taste-skill-ignore: a fixed button floating over the content
 
 const WORKER_API_BASE = "https://terabox.onlineplayer.site";
 
@@ -64,6 +66,41 @@ export default function TeraBoxVideosPage() {
 
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Sticky search: shown once the page's own search box has scrolled under the header
+  const searchEndRef = useRef<HTMLDivElement>(null);
+  const [searchStuck, setSearchStuck] = useState(false);
+  const [showTop, setShowTop] = useState(false);
+
+  useEffect(() => {
+    const sentinel = searchEndRef.current;
+    if (!sentinel) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setSearchStuck(!entry.isIntersecting && entry.boundingClientRect.top < 72),
+      { rootMargin: "-72px 0px 0px 0px" } // the site header is 72px tall
+    );
+    io.observe(sentinel);
+
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setShowTop(window.scrollY > 900);
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      io.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  };
 
   // Load bookmarks on mount
   useEffect(() => {
@@ -339,6 +376,7 @@ export default function TeraBoxVideosPage() {
             </div>
           </form>
         </div>
+        <div ref={searchEndRef} aria-hidden="true" />
 
         {/* Result count and filters */}
         <div className="mt-14 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -453,8 +491,13 @@ export default function TeraBoxVideosPage() {
                       <span className="absolute bottom-2 right-2 rounded-[4px] bg-stage px-2 py-0.5 text-small text-stage-ink tabular">{item.duration}</span>
                     )}
                   </button>
-                  <h3 className="mt-3 text-body font-medium leading-snug line-clamp-2 [overflow-wrap:anywhere]">
-                    <button type="button" onClick={() => handlePlayModal(item)} className="text-left hover:underline underline-offset-4 cursor-pointer">
+                  <h3 className="mt-3 text-body font-medium leading-snug min-h-[2.75em]">
+                    <button
+                      type="button"
+                      onClick={() => handlePlayModal(item)}
+                      title={item.title}
+                      className="w-full text-left line-clamp-2 [overflow-wrap:anywhere] hover:underline underline-offset-4 cursor-pointer"
+                    >
                       {item.title}
                     </button>
                   </h3>
@@ -503,6 +546,49 @@ export default function TeraBoxVideosPage() {
       </main>
 
       <SiteFooter />
+
+      {/* Compact search that follows the page once the main one is out of view */}
+      <div
+        className={`fixed inset-x-0 top-[72px] z-30 bg-bg transition-[transform,opacity] duration-300 ease-[var(--ease-out)] motion-reduce:transition-none ${
+          searchStuck ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!searchStuck}
+        inert={!searchStuck}
+      >
+        <form onSubmit={handleSearchSubmit} className="frame py-2" role="search">
+          <label htmlFor="video-search-sticky" className="sr-only">
+            Search videos
+          </label>
+          <div className="flex items-stretch gap-2 rounded-ui bg-paper p-1.5 focus-within:outline-3 focus-within:outline-accent">
+            <Search className="h-5 w-5 self-center ml-2 text-muted shrink-0" strokeWidth={2.4} />
+            <input
+              id="video-search-sticky"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title"
+              className="min-w-0 flex-1 bg-transparent px-2 text-body placeholder:text-muted focus:outline-none"
+            />
+            <button type="submit" className="btn btn-accent min-h-[44px]">
+              Search
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Back to the top */}
+      <button
+        type="button"
+        onClick={scrollToTop}
+        aria-label="Back to top"
+        title="Back to top"
+        className={`btn btn-ink fixed z-30 right-4 sm:right-6 bottom-[max(16px,env(safe-area-inset-bottom))] sm:bottom-6 min-h-[52px] w-[52px] px-0 ${FLOAT_SHADOW} transition-[transform,opacity] duration-300 ease-[var(--ease-out)] motion-reduce:transition-none ${
+          showTop ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
+        }`}
+        tabIndex={showTop ? 0 : -1}
+      >
+        <ArrowUp className="h-5 w-5" strokeWidth={2.4} />
+      </button>
 
       {/* In-page player */}
       {activeModalVideo && (
