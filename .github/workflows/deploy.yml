@@ -44,7 +44,7 @@ jobs:
             echo "has_token=false" >> "$GITHUB_OUTPUT"
             echo "::warning::CLOUDFLARE_API_TOKEN is not set, skipping deploys."
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
       - id: pick
@@ -85,12 +85,12 @@ jobs:
         env:
           CHANGED: ${{ needs.plan.outputs[matrix.worker] }}
         run: echo "run=$CHANGED" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.gate.outputs.run == 'true'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.gate.outputs.run == 'true'
         with:
-          node-version: 22
+          node-version: 24
       - name: Install
         if: steps.gate.outputs.run == 'true'
         working-directory: backend/${{ matrix.worker }}/worker
@@ -109,13 +109,13 @@ jobs:
     if: needs.plan.outputs.has_token == 'true' && needs.plan.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: frontend-out
           path: out
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
       - name: Deploy to Cloudflare Pages (onlineplayer.site)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
