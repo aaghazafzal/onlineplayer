@@ -15,7 +15,6 @@ const PROVIDER_COPY: Record<ProviderKind, { name: string; gives: string; service
   instagram: { name: "Instagram post", gives: "videos and photos, every slide", service: "instagram" },
   spotify: { name: "Spotify link", gives: "full song at 320 kbps, or the whole playlist", service: "spotify" },
   jiosaavn: { name: "JioSaavn link", gives: "songs, albums, playlists and artists at 320 kbps", service: "jiosaavn" },
-  youtube: { name: "YouTube link", gives: "videos, Shorts and playlists without ads, up to 1080p", service: "youtube" },
   direct: { name: "Direct video file", gives: "plays as it is" },
   diskwala: { name: "DiskWala link", gives: "not supported yet" },
 };
@@ -78,7 +77,7 @@ export function LinkBox({ onResolve, isLoading }: LinkBoxProps) {
             setUrl(e.target.value);
             setNudge(false);
           }}
-          placeholder="Paste a TeraBox, Instagram, Spotify, JioSaavn or YouTube link"
+          placeholder="Paste a TeraBox, Instagram, Spotify or JioSaavn link"
           className="min-w-0 flex-1 bg-transparent px-3 text-body text-ink placeholder:text-muted focus:outline-none"
           disabled={isLoading}
         />

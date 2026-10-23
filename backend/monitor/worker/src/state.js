@@ -20,15 +20,17 @@ export function emptyState() {
  * @returns {{ state: object, alerts: Array<{type:"down"|"recovered", id:string, name:string, error?:string, downSince?:number}> }}
  */
 export function applyResults(prev, results, now) {
+  // Every run reports every check, so checks that are no longer run (a removed service) drop out here
+  const prevChecks = prev?.checks || {};
   const state = {
     updatedAt: now,
-    checks: { ...(prev?.checks || {}) },
+    checks: {},
     history: [...(prev?.history || [])],
   };
   const alerts = [];
 
   for (const r of results) {
-    const old = state.checks[r.id] || { ok: true, since: now, failStreak: 0, alerted: false };
+    const old = prevChecks[r.id] || { ok: true, since: now, failStreak: 0, alerted: false };
     const next = {
       id: r.id,
       name: r.name,

@@ -3,11 +3,11 @@ import "./globals.css";
 import { ThemeProvider } from "../context/ThemeContext";
 
 const description =
-  "Paste a TeraBox, Instagram, Spotify, JioSaavn or YouTube link and play or download it in your browser: full-length videos, reels and 320 kbps songs. Free, no login, no ads.";
+  "Paste a TeraBox, Instagram, Spotify or JioSaavn link and play or download it in your browser: full-length videos, reels and 320 kbps songs. Free, no login, no ads.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://onlineplayer.site"),
-  title: "OnlinePlayer: play and download TeraBox, Instagram, Spotify, JioSaavn and YouTube links",
+  title: "OnlinePlayer: play and download TeraBox, Instagram, Spotify and JioSaavn links",
   description,
   icons: {
     icon: [

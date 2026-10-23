@@ -11,7 +11,7 @@ export interface ServiceStatus {
   lastCheckedAt: number | null;
 }
 
-export type ServiceId = "site" | "terabox" | "resolver" | "instagram" | "spotify" | "jiosaavn" | "youtube";
+export type ServiceId = "site" | "terabox" | "resolver" | "instagram" | "spotify" | "jiosaavn";
 
 /**
  * Live state of each service from the health monitor (checked every 15 minutes).

@@ -1,6 +1,6 @@
 # OnlinePlayer
 
-Paste a link, stream or download it: TeraBox videos, Instagram reels/posts and Spotify tracks/playlists, all in the browser.
+Paste a link, stream or download it: TeraBox videos, Instagram reels/posts, Spotify tracks/playlists and JioSaavn songs/albums/playlists, all in the browser.
 
 **Live:** https://onlineplayer.site · **Status:** https://status.onlineplayer.site
 
@@ -13,6 +13,7 @@ Paste a link, stream or download it: TeraBox videos, Instagram reels/posts and S
 | TeraBox cloud resolver | `backend/terabox/resolver` | Render (Node/Express) | terabox-resolver-csit.onrender.com |
 | Instagram worker | `backend/instagram/worker` | Cloudflare Worker `instagram-player-api` | instagram.onlineplayer.site |
 | Spotify worker | `backend/spotify/worker` | Cloudflare Worker `spotify-player-api` | spotify.onlineplayer.site |
+| JioSaavn worker | `backend/jiosaavn/worker` | Cloudflare Worker `jiosaavn-player-api` | jiosaavn.onlineplayer.site |
 | Health monitor | `backend/monitor/worker` | Cloudflare Worker `onlineplayer-monitor` (cron, every 15 min) | status.onlineplayer.site |
 
 Every provider is its own Worker on its own `<provider>.onlineplayer.site` subdomain, with a `*.onlineplayer.workers.dev` fallback that the frontend uses when the custom domain is unreachable. New providers follow the same pattern.

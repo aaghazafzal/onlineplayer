@@ -4,20 +4,18 @@ import type { InstagramMediaItem, InstagramPostData } from "../components/Instag
 import type { SpotifyTrackData } from "../components/AudioPlayer";
 import type { SpotifyPlaylistData, SpotifyPlaylistItem } from "../components/SpotifyPlaylistViewer";
 import type { HistoryItem } from "../components/RecentStreams";
-import type { YouTubeData } from "../components/YouTubeViewer";
 import { ApiError, fetchProviderJson } from "./api";
 
 export type { SpotifyPlaylistData, SpotifyPlaylistItem };
 
-export type ProviderKind = "direct" | "instagram" | "spotify" | "jiosaavn" | "youtube" | "terabox" | "diskwala";
+export type ProviderKind = "direct" | "instagram" | "spotify" | "jiosaavn" | "terabox" | "diskwala";
 
 export type ResolveResult =
   | { kind: "direct"; stream: StreamData }
   | { kind: "instagram"; post: InstagramPostData; history: HistoryItem }
   | { kind: "spotify"; track: SpotifyTrackData; history: HistoryItem }
   | { kind: "spotify_playlist"; playlist: SpotifyPlaylistData; history: HistoryItem }
-  | { kind: "terabox"; files: FileItem[]; stream: StreamData; cached: boolean; history: HistoryItem | null }
-  | { kind: "youtube"; video: YouTubeData; history: HistoryItem };
+  | { kind: "terabox"; files: FileItem[]; stream: StreamData; cached: boolean; history: HistoryItem | null };
 
 const TERABOX_HOST_HINTS = [
   "terabox", "1024tera", "dubox", "nephobox", "mirrobox", "momerybox",
@@ -29,7 +27,6 @@ export function detectProvider(rawUrl: string): ProviderKind | null {
   const path = url.split(/[?#]/)[0];
   if (path.endsWith(".m3u8") || path.endsWith(".mp4")) return "direct";
   if (url.includes("instagram.com") || url.includes("instagr.am")) return "instagram";
-  if (/(^|\/\/|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)\//.test(url)) return "youtube";
   if (/(^|\/\/|\.)(jiosaavn\.com|saavn\.com|jiosaavn\.page\.link)\//.test(url)) return "jiosaavn";
   if (
     url.includes("spotify.com") ||
@@ -350,29 +347,6 @@ async function resolveJioSaavn(url: string): Promise<ResolveResult> {
   };
 }
 
-// ---------------------------------------------------------------------------
-// YouTube: played through YouTube's embedded player
-// ---------------------------------------------------------------------------
-async function resolveYouTube(url: string): Promise<ResolveResult> {
-  const { status, data } = await fetchProviderJson<YouTubeData & { ok?: boolean; error?: string }>("youtube", `/api/resolve?url=${enc(url)}`);
-  if (status >= 400 || !data.ok) throw new ApiError(data.error || "Could not open this YouTube link.", status);
-  const video: YouTubeData = { ...data, provider: "youtube" };
-  return {
-    kind: "youtube",
-    video,
-    history: {
-      surl: `yt:${video.type}:${video.id}`,
-      originalUrl: url,
-      title: video.title,
-      durationFormatted: video.type === "playlist" ? `${video.totalVideos || video.videos?.length || 0} videos` : video.isShort ? "Short" : "YouTube",
-      sizeFormatted: "YouTube",
-      thumbnail: video.type === "playlist" ? video.videos?.[0]?.thumbnail || "" : `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
-      streamUrl: url,
-      playedAt: Date.now(),
-    },
-  };
-}
-
 interface TeraboxApiFile {
   fs_id: string;
   filename?: string;
@@ -451,15 +425,13 @@ export async function resolveLink(rawUrl: string): Promise<ResolveResult> {
       return resolveTerabox(url);
     case "jiosaavn":
       return resolveJioSaavn(url);
-    case "youtube":
-      return resolveYouTube(url);
     case "diskwala":
       throw new ApiError(
         "DiskWala support is coming in the next update. TeraBox, Instagram and Spotify links work right now."
       );
     default:
       throw new ApiError(
-        "This link is not supported yet. TeraBox, Instagram, Spotify, JioSaavn, YouTube and direct .mp4/.m3u8 links work."
+        "This link is not supported yet. TeraBox, Instagram, Spotify, JioSaavn and direct .mp4/.m3u8 links work."
       );
   }
 }

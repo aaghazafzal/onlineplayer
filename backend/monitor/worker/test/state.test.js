@@ -54,3 +54,9 @@ test("history is capped and uptime is computed per check", () => {
   assert.equal(up.a, 100);
   assert.equal(up.b, 75);
 });
+
+test("checks that are no longer run disappear from the state", () => {
+  const prev = applyResults(null, [{ id: "a", name: "A", ok: true }, { id: "gone", name: "Gone", ok: true }], 1000).state;
+  const { state } = applyResults(prev, [{ id: "a", name: "A", ok: true }], 2000);
+  assert.deepEqual(Object.keys(state.checks), ["a"]);
+});

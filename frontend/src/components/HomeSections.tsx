@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUp } from "lucide-react";
-import { DirectFragment, InstagramFragment, JioSaavnFragment, SpotifyFragment, TeraBoxFragment, YouTubeFragment } from "./ProductFragments";
+import { DirectFragment, InstagramFragment, JioSaavnFragment, SpotifyFragment, TeraBoxFragment } from "./ProductFragments";
 
 /* ==========================================================================
    Hero stage: the accent field at full height with the three players
    crossfading slowly (signature move). Reduced motion shows the first only.
    ========================================================================== */
-const STAGE_FRAGMENTS = [TeraBoxFragment, InstagramFragment, SpotifyFragment, JioSaavnFragment, YouTubeFragment];
+const STAGE_FRAGMENTS = [TeraBoxFragment, InstagramFragment, SpotifyFragment, JioSaavnFragment];
 
 export function HeroStage() {
   const [active, setActive] = useState(0);
@@ -78,13 +78,6 @@ const SERVICES = [
     block: "bg-field-2",
     Fragment: JioSaavnFragment,
     fact: "Songs, albums, playlists and an artist's top songs, all at up to 320 kbps. Playing and saving come straight from JioSaavn's servers.",
-  },
-  {
-    id: "youtube",
-    name: "YouTube",
-    block: "bg-field-4",
-    Fragment: YouTubeFragment,
-    fact: "Videos, Shorts and playlists play here without ads, from 144p up to 1080p. Save any of them as MP4 in the quality you pick, or just the sound as M4A.",
   },
   {
     id: "direct",
@@ -242,16 +235,6 @@ const FORMATS: { name: string; rows: [string, string][] }[] = [
     ],
   },
   {
-    name: "YouTube",
-    rows: [
-      ["youtube.com/watch?v=…", "Video"],
-      ["youtu.be/…", "Video"],
-      ["youtube.com/shorts/…", "Short"],
-      ["youtube.com/playlist?list=…", "Whole playlist"],
-      ["music.youtube.com/watch?v=…", "Song video"],
-    ],
-  },
-  {
     name: "Direct video files",
     rows: [
       ["…/video.mp4", "Plays as it is"],
@@ -335,12 +318,8 @@ const QUESTIONS: [string, string][] = [
     "The first time anyone opens a link, the full stream has to be found. After that it is cached, so it starts almost at once for a few hours.",
   ],
   [
-    "Why do some YouTube videos show YouTube's own player?",
-    "Now and then YouTube asks our server to sign in before it hands over a video, and we do not get around that. For that video the page falls back to YouTube's player, which can show ads, and downloads wait until YouTube lets us through again, usually within minutes.",
-  ],
-  [
     "How do downloads work?",
-    "TeraBox videos are saved as MP4, assembled in your browser from the stream. Instagram media, Spotify and JioSaavn songs (.m4a) download directly, and YouTube videos are joined into one MP4 in your browser, with sound.",
+    "TeraBox videos are saved as MP4, assembled in your browser from the stream. Instagram media, Spotify and JioSaavn songs (.m4a) download directly.",
   ],
   [
     "Does it work on my phone?",
@@ -428,7 +407,6 @@ export function SiteFooter() {
             <Link className="link" href="/#services">Instagram</Link>
             <Link className="link" href="/#services">Spotify</Link>
             <Link className="link" href="/#services">JioSaavn</Link>
-            <Link className="link" href="/#services">YouTube</Link>
           </nav>
           <nav aria-label="Help" className="lg:col-span-2 flex flex-col gap-2">
             <Link className="link" href="/#how">How it works</Link>

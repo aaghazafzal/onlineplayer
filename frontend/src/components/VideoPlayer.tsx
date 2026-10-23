@@ -112,7 +112,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     failedRef.current = onPlaybackFailed;
   }, [onPlaybackFailed]);
-  // Qualities offered by an HLS master playlist (YouTube); -1 is automatic
+  // Qualities offered by an HLS master playlist; -1 is automatic
   const [hlsLevels, setHlsLevels] = useState<{ index: number; height: number }[]>([]);
   const [hlsLevel, setHlsLevel] = useState(-1);
   const videoRef = useRef<HTMLVideoElement>(null);

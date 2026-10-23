@@ -31,10 +31,6 @@ jobs:
         working-directory: backend/jiosaavn/worker
         run: node --test "test/*.test.js"
 
-      - name: YouTube parser tests
-        working-directory: backend/youtube/worker
-        run: node --test "test/*.test.js"
-
       - name: Monitor state tests
         working-directory: backend/monitor/worker
         run: node --test "test/*.test.js"

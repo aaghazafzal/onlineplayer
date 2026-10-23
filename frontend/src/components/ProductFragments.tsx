@@ -169,33 +169,3 @@ export function JioSaavnFragment({ className = "" }: { className?: string }) {
     </figure>
   );
 }
-
-export function YouTubeFragment({ className = "" }: { className?: string }) {
-  return (
-    <figure className={`on-stage bg-stage text-stage-ink rounded-ui p-3 sm:p-4 ${className}`}>
-      <div className="relative aspect-video overflow-clip rounded-ui">
-        <img
-          src="/media/photo-954.jpg"
-          alt="A narrow opening in a white wall showing a white staircase"
-          width={1200}
-          height={1500}
-          loading="lazy"
-          className="h-full w-full object-cover"
-        />
-        <span className="absolute inset-0 m-auto inline-flex h-14 w-14 items-center justify-center rounded-ui bg-accent text-accent-ink">
-          <Play className="h-6 w-6 fill-current" strokeWidth={2.4} />
-        </span>
-      </div>
-      <figcaption data-ui className="mt-3 space-y-3">
-        <div className="text-small">
-          <p className="font-medium truncate">Stairs of light, a short film</p>
-          <p className="text-stage-muted">YouTube · no ads · up to 1080p</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-small">
-          <span className="btn btn-accent min-h-[40px] text-small">MP4</span>
-          <span className="btn min-h-[40px] text-small bg-stage-ink text-stage">M4A</span>
-        </div>
-      </figcaption>
-    </figure>
-  );
-}

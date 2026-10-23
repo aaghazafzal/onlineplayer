@@ -5,7 +5,6 @@ export const PROVIDER_ENDPOINTS = {
   instagram: ["https://instagram.onlineplayer.site", "https://instagram-player-api.onlineplayer.workers.dev"],
   spotify: ["https://spotify.onlineplayer.site", "https://spotify-player-api.onlineplayer.workers.dev"],
   jiosaavn: ["https://jiosaavn.onlineplayer.site", "https://jiosaavn-player-api.onlineplayer.workers.dev"],
-  youtube: ["https://youtube.onlineplayer.site", "https://youtube-player-api.onlineplayer.workers.dev"],
 } as const;
 
 export type ProviderName = keyof typeof PROVIDER_ENDPOINTS;
