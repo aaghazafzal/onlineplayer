@@ -40,3 +40,6 @@ __pycache__/
 # Local secrets for wrangler dev
 **/.dev.vars
 !**/.dev.vars.example
+
+# Design tooling output
+.taste-skill/

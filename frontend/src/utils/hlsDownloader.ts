@@ -137,7 +137,8 @@ export async function downloadVideoStream(
         speedMBs: 0,
       });
       return;
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as Error;
       if (abortSignal?.aborted || err.message === "Download cancelled") {
         throw new Error("Download cancelled");
       }
@@ -261,7 +262,8 @@ export async function downloadVideoStream(
             const ab = await res.arrayBuffer();
             chunkData = new Uint8Array(ab);
             success = true;
-          } catch (e: any) {
+          } catch (caught) {
+            const e = caught as Error;
             if (abortSignal?.aborted) throw e;
             if (attempts >= 3) throw new Error(`Chunk ${idx + 1} download error: ${e.message}`);
             await new Promise((r) => setTimeout(r, 500));
@@ -349,7 +351,8 @@ export async function downloadVideoStream(
       speedMBs: 0,
     });
 
-  } catch (err: any) {
+  } catch (caught) {
+    const err = caught as Error;
     if (abortSignal?.aborted || err.message === "Download cancelled") {
       onProgress?.({
         status: "cancelled",

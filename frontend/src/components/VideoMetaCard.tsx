@@ -1,20 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { 
-  Download, 
-  Copy, 
-  Check, 
-  Film, 
-  Clock, 
-  HardDrive, 
-  ShieldCheck, 
-  FolderOpen,
-  PlayCircle,
-  Loader2,
-  X,
-  AlertCircle
-} from "lucide-react";
+import { Download, Copy, Check, PlayCircle, X, AlertCircle } from "lucide-react";
 import { downloadVideoStream, DownloadProgress } from "../utils/hlsDownloader";
 
 export interface FileItem {
@@ -94,7 +81,8 @@ export const VideoMetaCard: React.FC<VideoMetaCardProps> = ({
         },
         controller.signal
       );
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as Error;
       if (err.message !== "Download cancelled") {
         console.error("Download failed:", err);
         setDownloadProgress({
@@ -119,186 +107,95 @@ export const VideoMetaCard: React.FC<VideoMetaCardProps> = ({
     }
   }, [autoStartDownload, streamUrl]);
 
+  const isHls = streamUrl.includes("m3u8") || streamUrl.includes("/proxy?stream=");
+  const busy = downloadProgress && ["downloading", "preparing", "assembling"].includes(downloadProgress.status);
+
   return (
-    <div className="w-full max-w-[1360px] mx-auto space-y-5">
-      {/* Primary Card */}
-      <div className="p-5 sm:p-7 rounded-3xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-xl shadow-zinc-950/5 dark:shadow-black/40 overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 min-w-0 w-full">
-          
-          {/* Title & Metadata (min-w-0 with word break to prevent screen overflow) */}
-          <div className="space-y-2.5 min-w-0 flex-1 w-full overflow-hidden">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
-                <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2.5} />
-                {streamUrl.includes("m3u8") ? "Full 1080p / 720p Stream" : "Original HD Quality"}
-              </span>
+    <div className="w-full space-y-3">
+      <div className="rounded-ui bg-paper p-5 sm:p-7 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lead font-semibold tracking-[-0.02em] leading-snug [overflow-wrap:anywhere]">{title}</h2>
+          <p className="mt-2 text-small text-muted flex flex-wrap gap-x-4 gap-y-1">
+            {durationFormatted && <span className="tabular">{durationFormatted}</span>}
+            {sizeFormatted && <span className="tabular">{sizeFormatted}</span>}
+            <span>{isHls ? "Full-length HLS stream" : "Direct video file"}</span>
+            {isCached && <span>Opened from cache</span>}
+          </p>
+        </div>
 
-              {isCached && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
-                  Instant Edge Hit
-                </span>
-              )}
-            </div>
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+          <button onClick={handleCopy} className="btn btn-quiet flex-1 sm:flex-none min-h-[48px] text-small" title="Copy stream URL">
+            {copied ? <Check className="h-4 w-4" strokeWidth={2.5} /> : <Copy className="h-4 w-4" strokeWidth={2.3} />}
+            {copied ? "Copied" : "Copy URL"}
+          </button>
+          <a href={`vlc://${streamUrl}`} className="btn btn-quiet flex-1 sm:flex-none min-h-[48px] text-small" title="Open the stream in VLC">
+            Open in VLC
+          </a>
 
-            {/* Title with full wrap support for long underscore filenames */}
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-zinc-950 dark:text-white tracking-tight leading-snug break-all sm:break-words [overflow-wrap:anywhere]">
-              {title}
-            </h1>
-
-            {/* Meta Info Badges */}
-            <div className="flex items-center gap-4 text-xs font-medium text-zinc-600 dark:text-zinc-400 flex-wrap">
-              {durationFormatted && (
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-zinc-400" strokeWidth={2.3} />
-                  <span>{durationFormatted}</span>
-                </div>
-              )}
-
-              {sizeFormatted && (
-                <div className="flex items-center gap-1.5">
-                  <HardDrive className="h-4 w-4 text-zinc-400" strokeWidth={2.3} />
-                  <span>{sizeFormatted}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5">
-                <Film className="h-4 w-4 text-zinc-400" strokeWidth={2.3} />
-                <span>{streamUrl.includes("m3u8") ? "HLS Adaptive Stream" : "Direct High-Speed Stream"}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap w-full lg:w-auto">
+          {busy && downloadProgress ? (
             <button
-              onClick={handleCopy}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-[#121217] hover:bg-zinc-200 dark:hover:bg-[#20202a] border border-zinc-300 dark:border-[#2a2a38] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              title="Copy stream URL"
+              onClick={handleDownload}
+              className="btn btn-ink relative overflow-clip w-full sm:w-auto sm:min-w-[240px] min-h-[48px] text-small justify-between"
+              title="Cancel the download"
             >
-              {copied ? (
-                <>
-                  <Check className="h-4 w-4 text-emerald-500" strokeWidth={2.5} />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4" strokeWidth={2.3} />
-                  <span>Copy URL</span>
-                </>
-              )}
+              <span className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-300" style={{ width: `${downloadProgress.percent}%` }} aria-hidden="true" />
+              <span className="relative inline-flex items-center gap-2">
+                <span className="h-4 w-4 rounded-full border-2 border-current border-r-transparent animate-[spin_0.8s_linear_infinite]" />
+                {downloadProgress.status === "assembling" ? "Saving the file" : `Downloading ${downloadProgress.percent}%`}
+              </span>
+              <span className="relative inline-flex items-center gap-1 tabular">
+                {downloadProgress.speedMBs > 0 ? `${downloadProgress.speedMBs} MB/s` : `${downloadProgress.downloadedChunks}/${downloadProgress.totalChunks}`}
+                <X className="h-4 w-4" strokeWidth={2.6} aria-label="Cancel" />
+              </span>
             </button>
-
-            <a
-              href={`vlc://${streamUrl}`}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-[#121217] hover:bg-zinc-200 dark:hover:bg-[#20202a] border border-zinc-300 dark:border-[#2a2a38] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              title="Open stream in VLC Media Player"
+          ) : downloadProgress?.status === "completed" ? (
+            <span className="btn btn-accent w-full sm:w-auto min-h-[48px] text-small" role="status">
+              <Check className="h-4 w-4" strokeWidth={3} /> Downloaded
+            </span>
+          ) : downloadProgress?.status === "error" ? (
+            <button
+              onClick={handleDownload}
+              className="btn w-full sm:w-auto min-h-[48px] text-small bg-danger text-paper"
+              title={downloadProgress.error || "Download failed. Try again."}
             >
-              <Film className="h-4 w-4" strokeWidth={2.3} />
-              <span>VLC Player</span>
-            </a>
-
-            {/* Direct Download Button with Real-Time In-Browser Progress */}
-            {downloadProgress && (downloadProgress.status === "downloading" || downloadProgress.status === "preparing" || downloadProgress.status === "assembling") ? (
-              <div className="w-full sm:w-auto min-w-[210px]">
-                <button
-                  onClick={handleDownload}
-                  className="relative overflow-hidden w-full px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-rose-600 transition-all flex items-center justify-between gap-3 shadow-md shadow-blue-600/20 cursor-pointer group"
-                  title="Click to cancel download"
-                >
-                  {/* Visual Progress Fill */}
-                  <div 
-                    className="absolute inset-y-0 left-0 bg-blue-500/60 transition-all duration-300"
-                    style={{ width: `${downloadProgress.percent}%` }}
-                  />
-
-                  {/* Left Label */}
-                  <div className="relative z-10 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-white shrink-0" strokeWidth={2.6} />
-                    <span className="truncate">
-                      {downloadProgress.status === "assembling"
-                        ? "Saving File..."
-                        : `Downloading ${downloadProgress.percent}%`}
-                    </span>
-                  </div>
-
-                  {/* Right Details / Cancel on hover */}
-                  <div className="relative z-10 flex items-center gap-1.5 text-[11px] font-mono shrink-0 pl-2">
-                    <span className="group-hover:hidden opacity-95">
-                      {downloadProgress.speedMBs > 0 ? `${downloadProgress.speedMBs} MB/s` : `${downloadProgress.downloadedChunks}/${downloadProgress.totalChunks}`}
-                    </span>
-                    <span className="hidden group-hover:inline-flex items-center gap-1 text-white font-bold">
-                      <X className="h-3.5 w-3.5" strokeWidth={3} />
-                      <span>Cancel</span>
-                    </span>
-                  </div>
-                </button>
-              </div>
-            ) : downloadProgress?.status === "completed" ? (
-              <button
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20"
-              >
-                <Check className="h-4 w-4 text-white" strokeWidth={3} />
-                <span>Downloaded!</span>
-              </button>
-            ) : downloadProgress?.status === "error" ? (
-              <button
-                onClick={handleDownload}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-rose-600/20"
-                title={downloadProgress.error || "Download error. Click to retry."}
-              >
-                <AlertCircle className="h-4 w-4 text-white" strokeWidth={2.4} />
-                <span>Retry Download</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleDownload}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#059669] hover:bg-[#047857] shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-              >
-                <Download className="h-4 w-4" strokeWidth={2.5} />
-                <span>Direct Download</span>
-              </button>
-            )}
-          </div>
+              <AlertCircle className="h-4 w-4" strokeWidth={2.4} /> Try the download again
+            </button>
+          ) : (
+            <button onClick={handleDownload} className="btn btn-accent w-full sm:w-auto min-h-[48px] text-small">
+              <Download className="h-4 w-4" strokeWidth={2.5} /> Download MP4
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Multi-File Episode/Playlist Selector (if files > 1) */}
       {files.length > 1 && (
-        <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-md overflow-hidden">
-          <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            <FolderOpen className="h-4 w-4 text-blue-500" strokeWidth={2.3} />
-            <span>Folder Playlist ({files.length} Videos)</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {files.map((file, idx) => (
-              <button
-                key={file.fs_id || idx}
-                onClick={() => onSelectFile(idx)}
-                className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 min-w-0 ${
-                  idx === currentFileIndex
-                    ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300 shadow-sm"
-                    : "bg-zinc-50 dark:bg-[#121217] border-zinc-200 dark:border-[#262633] text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-700"
-                }`}
-              >
-                <div className={`p-2 rounded-xl shrink-0 ${
-                  idx === currentFileIndex
-                    ? "bg-blue-600 text-white"
-                    : "bg-zinc-200 dark:bg-[#20202a] text-zinc-600 dark:text-zinc-400"
-                }`}>
-                  <PlayCircle className="h-4 w-4" strokeWidth={2.4} />
-                </div>
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <p className="text-xs font-bold truncate">
-                    {file.filename}
-                  </p>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    {file.size_formatted} {file.duration_formatted ? `• ${file.duration_formatted}` : ""}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
+        <div className="rounded-ui bg-paper p-5 sm:p-6">
+          <h3 className="text-body font-semibold">This folder has {files.length} videos</h3>
+          <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {files.map((file, idx) => {
+              const active = idx === currentFileIndex;
+              return (
+                <li key={file.fs_id || idx}>
+                  <button
+                    onClick={() => onSelectFile(idx)}
+                    aria-current={active}
+                    className={`w-full min-h-[64px] p-3 rounded-ui text-left flex items-center gap-3 transition-colors ${
+                      active ? "bg-accent text-accent-ink" : "bg-surface-2 hover:bg-surface"
+                    }`}
+                  >
+                    <PlayCircle className="h-5 w-5 shrink-0" strokeWidth={2.2} />
+                    <span className="min-w-0">
+                      <span className="block text-small font-medium truncate">{file.filename}</span>
+                      <span className={`block text-small tabular ${active ? "opacity-85" : "text-muted"}`}>
+                        {file.size_formatted}
+                        {file.duration_formatted ? ` · ${file.duration_formatted}` : ""}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
     </div>

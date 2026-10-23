@@ -10,27 +10,85 @@ import {
   VolumeX,
   Maximize,
   Minimize,
-  Download,
   Copy,
   Check,
   Settings,
-  RotateCcw,
-  FastForward,
   Tv,
   PictureInPicture,
-  Film,
   AlertCircle
 } from "lucide-react";
 
 export interface StreamData {
   streamUrl: string;
   streamUrl360?: string;
+  /** Tried once if streamUrl fails (e.g. the CDN refuses this browser) */
+  fallbackUrl?: string;
   title: string;
   durationSeconds?: number;
   durationFormatted?: string;
   sizeFormatted?: string;
   thumbnail?: string;
   surl?: string;
+}
+
+const SCRIM = "bg-gradient-to-t from-black/85 to-transparent"; // taste-skill-ignore: neutral scrim over footage, the house rules' one gradient
+const MENU_SHADOW = "shadow-[0_12px_40px_rgba(0,0,0,0.35)]"; // taste-skill-ignore: a real menu floating over video
+
+/** Our TeraBox playlists accept ?direct=1 to list CDN segment URLs instead of proxied ones. */
+function directPlaylistUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const ours = u.hostname === "terabox.onlineplayer.site" || u.hostname.endsWith(".onlineplayer.workers.dev");
+    if (!ours || !(u.pathname.startsWith("/playlist/") || u.pathname === "/proxy")) return url;
+    u.searchParams.set("direct", "1");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+// Vendor-prefixed Fullscreen / orientation APIs (Safari, old Firefox, old Edge)
+type FsDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  mozFullScreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+  mozCancelFullScreen?: () => Promise<void> | void;
+  msExitFullscreen?: () => Promise<void> | void;
+};
+type FsElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  mozRequestFullScreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+type LockableOrientation = ScreenOrientation & {
+  lock?: (orientation: string) => Promise<void>;
+  unlock?: () => void;
+};
+
+function fullscreenElement() {
+  const d = document as FsDocument;
+  return d.fullscreenElement || d.webkitFullscreenElement || d.mozFullScreenElement || d.msFullscreenElement || null;
+}
+
+async function requestFullscreen(el: HTMLElement) {
+  const e = el as FsElement;
+  if (e.requestFullscreen) return e.requestFullscreen();
+  if (e.webkitRequestFullscreen) return e.webkitRequestFullscreen();
+  if (e.mozRequestFullScreen) return e.mozRequestFullScreen();
+  if (e.msRequestFullscreen) return e.msRequestFullscreen();
+}
+
+async function exitFullscreen() {
+  const d = document as FsDocument;
+  if (d.exitFullscreen) return d.exitFullscreen();
+  if (d.webkitExitFullscreen) return d.webkitExitFullscreen();
+  if (d.mozCancelFullScreen) return d.mozCancelFullScreen();
+  if (d.msExitFullscreen) return d.msExitFullscreen();
+}
+
+function orientation() {
+  return (typeof screen !== "undefined" ? screen.orientation : undefined) as LockableOrientation | undefined;
 }
 
 interface VideoPlayerProps {
@@ -75,120 +133,135 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     ? streamData.streamUrl360
     : streamData.streamUrl;
 
-  // Initialize HLS.js
+  // Playback engine. Browsers with native HLS (iOS, Android, Safari) get the playlist
+  // with direct CDN segments (?direct=1): no Worker request per segment. Everything
+  // else, or a native failure, uses hls.js through the segment proxy.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !activeUrl) return;
 
     setPlayerError(null);
+    let cancelled = false;
 
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
+    const destroyHls = () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+    destroyHls();
 
-    const isHls = activeUrl.includes(".m3u8") || activeUrl.includes("m3u8");
+    const restorePosition = (margin: number) => {
+      if (!streamData.surl) return;
+      try {
+        const pos = parseFloat(localStorage.getItem(`pos_${streamData.surl}`) || "");
+        if (pos > 5 && pos < (video.duration || 100000) - margin) video.currentTime = pos;
+      } catch {
+        // storage unavailable
+      }
+    };
+    const autoplay = () => video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
 
-    if (isHls && Hls.isSupported()) {
+    const isHls = activeUrl.includes("m3u8") || activeUrl.includes("/share/streaming") || activeUrl.includes("/proxy?stream=");
+
+    const startHlsJs = () => {
+      if (!Hls.isSupported()) {
+        setPlayerError("This browser cannot play this stream. Try Chrome, Safari or Firefox.");
+        return;
+      }
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 90,
         maxBufferLength: 60,
         maxMaxBufferLength: 300,
-        autoStartLoad: true,
       });
-
       hlsRef.current = hls;
       hls.loadSource(activeUrl);
       hls.attachMedia(video);
-
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // Restore timestamp if saved in localStorage
-        if (streamData.surl) {
-          const savedPos = localStorage.getItem(`pos_${streamData.surl}`);
-          if (savedPos) {
-            const pos = parseFloat(savedPos);
-            if (pos > 5 && pos < (video.duration || 100000) - 30) {
-              video.currentTime = pos;
-            }
-          }
-        }
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        restorePosition(30);
+        autoplay();
       });
-
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              console.warn("Fatal network error encountered, attempting to recover...");
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.warn("Fatal media error encountered, recovering media...");
-              hls.recoverMediaError();
-              break;
-            default:
-              console.error("Unrecoverable HLS error:", data);
-              setPlayerError("Video playback stalled. Please refresh or retry link.");
-              hls.destroy();
-              break;
-          }
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else {
+          setPlayerError("Playback stopped. Press Play to retry, or open the link again.");
+          destroyHls();
         }
       });
-    } else if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Native Safari iOS/macOS HLS support
-      video.src = activeUrl;
-      video.addEventListener("loadedmetadata", () => {
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      });
+    };
+
+    const startNative = (src: string, onFail: () => void) => {
+      video.src = src;
+      video.onloadedmetadata = () => {
+        restorePosition(30);
+        autoplay();
+      };
+      video.onerror = () => {
+        if (cancelled) return;
+        video.onerror = null;
+        video.removeAttribute("src");
+        onFail();
+      };
+    };
+
+    // Apple WebKit (iPhone, iPad, Mac Safari) plays HLS natively without CORS, so it can
+    // read segments straight from TeraBox's CDN. Chrome's native HLS needs CORS, which that
+    // CDN does not send, so other browsers keep using hls.js through the proxy.
+    const nativeHls = video.canPlayType("application/vnd.apple.mpegurl") !== "";
+    const appleWebKit = /iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS|Android|Edg\//.test(navigator.userAgent);
+
+    if (isHls && nativeHls && appleWebKit) {
+      // direct CDN -> hls.js via proxy (iOS 17.1+, macOS) -> native via proxy
+      startNative(directPlaylistUrl(activeUrl), () =>
+        Hls.isSupported() ? startHlsJs() : startNative(activeUrl, () => setPlayerError("This stream could not be played. Open the link again."))
+      );
+    } else if (isHls && Hls.isSupported()) {
+      startHlsJs();
+    } else if (isHls && nativeHls) {
+      startNative(activeUrl, () => setPlayerError("This stream could not be played. Open the link again."));
+    } else if (isHls) {
+      startHlsJs(); // reports that this browser cannot play HLS
     } else {
-      // Native MP4 / Progressive Stream playback (Instagram, direct MP4)
+      // Progressive MP4 (Instagram, direct files)
       video.src = activeUrl;
       video.load();
       video.onloadedmetadata = () => {
-        if (streamData.surl) {
-          const savedPos = localStorage.getItem(`pos_${streamData.surl}`);
-          if (savedPos) {
-            const pos = parseFloat(savedPos);
-            if (pos > 5 && pos < (video.duration || 100000) - 10) {
-              video.currentTime = pos;
-            }
-          }
-        }
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        restorePosition(10);
+        autoplay();
       };
       video.onerror = () => {
-        console.error("Native video element playback error");
-        setPlayerError("Video stream could not be loaded. Please check the link or retry.");
+        if (streamData.fallbackUrl && video.src !== streamData.fallbackUrl) {
+          video.src = streamData.fallbackUrl;
+          video.load();
+          return;
+        }
+        setPlayerError("This video could not be loaded. Check the link or try again.");
       };
     }
 
     return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
+      cancelled = true;
+      video.onerror = null;
+      video.onloadedmetadata = null;
+      destroyHls();
     };
-  }, [activeUrl, streamData.surl]);
+  }, [activeUrl, streamData.surl, streamData.fallbackUrl]);
 
   // Listen for fullscreen change (including ESC key, swipe down, Android back gesture)
   useEffect(() => {
     const onFullscreenChange = () => {
-      const isFs = Boolean(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
-      );
+      const isFs = Boolean(fullscreenElement());
       setIsFullscreen(isFs);
-
       if (!isFs) {
         try {
-          if (screen.orientation && (screen.orientation as any).unlock) {
-            (screen.orientation as any).unlock();
-          }
-        } catch (e) {}
+          orientation()?.unlock?.();
+        } catch {
+          // orientation lock not supported
+        }
       }
     };
 
@@ -286,65 +359,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current;
     if (!container || !video) return;
 
-    // iOS Safari native fullscreen support
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    if (isIOS && (video as any).webkitEnterFullscreen) {
+    // iOS Safari only allows fullscreen on the video element itself
+    const iosVideo = video as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && iosVideo.webkitEnterFullscreen) {
       try {
-        (video as any).webkitEnterFullscreen();
+        iosVideo.webkitEnterFullscreen();
         return;
       } catch (e) {
         console.warn("iOS native fullscreen error:", e);
       }
     }
 
-    const isCurrentlyFullscreen = Boolean(
-      document.fullscreenElement ||
-      (document as any).webkitFullscreenElement ||
-      (document as any).mozFullScreenElement ||
-      (document as any).msFullscreenElement
-    );
-
-    if (!isCurrentlyFullscreen) {
+    if (!fullscreenElement()) {
       try {
-        if (container.requestFullscreen) {
-          await container.requestFullscreen();
-        } else if ((container as any).webkitRequestFullscreen) {
-          await (container as any).webkitRequestFullscreen();
-        } else if ((container as any).mozRequestFullScreen) {
-          await (container as any).mozRequestFullScreen();
-        } else if ((container as any).msRequestFullscreen) {
-          await (container as any).msRequestFullscreen();
-        }
+        await requestFullscreen(container);
         setIsFullscreen(true);
-
-        // Auto-rotate to landscape on mobile / tablet screens
-        try {
-          if (screen.orientation && (screen.orientation as any).lock) {
-            await (screen.orientation as any).lock("landscape").catch(() => {});
-          }
-        } catch (orientErr) {
-          console.warn("Screen orientation lock:", orientErr);
-        }
+        // Turn phones and tablets to landscape where the browser allows it
+        await orientation()?.lock?.("landscape").catch(() => {});
       } catch (err) {
         console.error("Fullscreen error:", err);
       }
     } else {
       try {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          await (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
-        }
+        await exitFullscreen();
         setIsFullscreen(false);
         try {
-          if (screen.orientation && (screen.orientation as any).unlock) {
-            (screen.orientation as any).unlock();
-          }
-        } catch (e) {}
+          orientation()?.unlock?.();
+        } catch {
+          // orientation lock not supported
+        }
       } catch (err) {
         console.error("Exit fullscreen error:", err);
       }
@@ -469,20 +512,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ref={playerContainerRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      className={`relative w-full bg-black transition-all duration-300 ${
-        isFullscreen
-          ? "fixed inset-0 h-screen w-screen max-w-none rounded-none border-none z-[99999]"
-          : `rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 ${
-              isTheaterMode ? "max-w-[1500px] mx-auto" : "max-w-[1360px] mx-auto"
-            }`
+      className={`relative w-full bg-stage text-stage-ink ${
+        isFullscreen ? "fixed inset-0 h-dvh w-screen z-[99999]" : "rounded-ui overflow-clip"
       }`}
     >
-      {/* Video Container (full viewport in fullscreen, 16:9 aspect-video when normal) */}
-      <div
-        className={`relative w-full bg-black flex items-center justify-center ${
-          isFullscreen ? "h-full" : "aspect-video"
-        }`}
-      >
+      <div className={`relative w-full bg-black flex items-center justify-center ${isFullscreen ? "h-full" : "aspect-video"}`}>
         <video
           ref={videoRef}
           onTimeUpdate={handleTimeUpdate}
@@ -492,88 +526,69 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           playsInline
         />
 
-        {/* Big Center Play Overlay (when paused) */}
         {!isPlaying && (
-          <button
-            onClick={togglePlay}
-            className="absolute z-20 h-20 w-20 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-2xl shadow-blue-600/40 backdrop-blur-md transition-transform hover:scale-110 active:scale-95"
-            aria-label="Play Video"
-          >
-            <Play className="h-9 w-9 fill-white stroke-white ml-1.5" strokeWidth={2.5} />
+          <button onClick={togglePlay} className="btn btn-accent absolute z-20 h-[72px] w-[72px] px-0" aria-label="Play video">
+            <Play className="h-8 w-8 fill-current ml-1" strokeWidth={2.4} />
           </button>
         )}
 
-        {/* Error Banner */}
         {playerError && (
-          <div className="absolute top-4 left-4 right-4 z-30 p-3 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-sm flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-red-400 shrink-0" strokeWidth={2.5} />
+          <div role="alert" className="absolute top-4 inset-x-4 z-30 p-4 rounded-ui bg-danger-soft text-ink text-small flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-danger shrink-0" strokeWidth={2.5} />
             <span>{playerError}</span>
           </div>
         )}
 
-        {/* Controls Overlay */}
+        {/* Controls, over a neutral scrim so they stay legible on any frame */}
         <div
-          className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/60 to-transparent pt-12 ${
-            isFullscreen ? "pb-6 px-6 sm:px-10" : "pb-3 px-4"
-          } transition-opacity duration-300 ${
-            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
+          className={`absolute inset-x-0 bottom-0 z-20 ${SCRIM} pt-14 ${
+            isFullscreen ? "pb-6 px-6 sm:px-10" : "pb-3 px-3 sm:px-4"
+          } transition-opacity duration-300 ${showControls ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >
-          {/* Progress / Seek Bar */}
           <div
             ref={progressBarRef}
             onClick={handleSeek}
-            className="group relative h-2 hover:h-3 w-full bg-zinc-700/60 rounded-full cursor-pointer mb-3 transition-all"
+            role="slider"
+            aria-label="Seek"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration) || 0}
+            aria-valuenow={Math.round(currentTime)}
+            className="group relative h-2 hover:h-3 w-full rounded-[2px] bg-white/20 cursor-pointer mb-3 transition-[height] duration-150"
           >
-            {/* Buffer Bar */}
+            <div className="absolute inset-y-0 left-0 rounded-[2px] bg-white/35" style={{ width: `${Math.min(100, bufferPercent)}%` }} />
+            <div className="absolute inset-y-0 left-0 rounded-[2px] bg-accent" style={{ width: `${Math.min(100, progressPercent)}%` }} />
             <div
-              className="absolute left-0 top-0 bottom-0 bg-zinc-500/50 rounded-full transition-all"
-              style={{ width: `${Math.min(100, bufferPercent)}%` }}
-            />
-            {/* Played Bar */}
-            <div
-              className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
-              style={{ width: `${Math.min(100, progressPercent)}%` }}
-            />
-            {/* Scrubber Knob */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity -ml-1.5"
+              className="absolute top-1/2 -translate-y-1/2 -ml-2 h-4 w-4 rounded-[3px] bg-white opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ left: `${Math.min(100, progressPercent)}%` }}
             />
           </div>
 
-          {/* Controls Bottom Row */}
-          <div className="flex items-center justify-between text-white text-xs sm:text-sm">
-            {/* Left Controls: Play, Time, Volume */}
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between text-white text-small">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={togglePlay}
-                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-ui hover:bg-white/10 transition-colors"
                 title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+                aria-label={isPlaying ? "Pause" : "Play"}
               >
-                {isPlaying ? (
-                  <Pause className="h-5 w-5 fill-white" strokeWidth={2.5} />
-                ) : (
-                  <Play className="h-5 w-5 fill-white ml-0.5" strokeWidth={2.5} />
-                )}
+                {isPlaying ? <Pause className="h-5 w-5 fill-white" strokeWidth={2.5} /> : <Play className="h-5 w-5 fill-white ml-0.5" strokeWidth={2.5} />}
               </button>
 
-              {/* Time Display */}
-              <div className="font-mono text-xs text-zinc-300">
-                <span>{formatSeconds(currentTime)}</span>
-                <span className="mx-1 text-zinc-500">/</span>
-                <span>{formatSeconds(duration)}</span>
+              <div className="tabular text-white/85">
+                {formatSeconds(currentTime)}
+                <span className="mx-1 text-white/50">/</span>
+                {formatSeconds(duration)}
               </div>
 
-              {/* Volume & Mute */}
-              <div className="flex items-center gap-1.5 group">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={toggleMute}
-                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-zinc-300 hover:text-white"
+                  className="h-10 w-10 inline-flex items-center justify-center rounded-ui hover:bg-white/10 transition-colors"
                   title="Mute (M)"
+                  aria-label={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeX className="h-5 w-5 text-red-400" strokeWidth={2.2} />
+                    <VolumeX className="h-5 w-5" strokeWidth={2.2} />
                   ) : volume < 0.5 ? (
                     <Volume1 className="h-5 w-5" strokeWidth={2.2} />
                   ) : (
@@ -587,116 +602,99 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   step="0.05"
                   value={isMuted ? 0 : volume}
                   onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                  className="w-16 h-1.5 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-sky-400 hidden sm:block"
+                  aria-label="Volume"
+                  className="w-20 h-1.5 cursor-pointer accent-[var(--accent)] hidden sm:block"
                 />
               </div>
             </div>
 
-            {/* Right Controls: Settings, Theater, PiP, Fullscreen */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* Quality & Settings Dropdown */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
               <div className="relative">
                 <button
                   onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-zinc-300 hover:text-white flex items-center gap-1 font-semibold text-xs"
-                  title={hasMultiQuality ? "Settings & Quality" : "Playback Settings"}
+                  aria-expanded={showSettingsMenu}
+                  className="h-10 px-2.5 inline-flex items-center gap-1.5 rounded-ui hover:bg-white/10 transition-colors font-medium"
+                  title="Quality and speed"
                 >
                   <Settings className="h-4 w-4" strokeWidth={2.2} />
-                  {hasMultiQuality && <span className="hidden sm:inline">{selectedQuality}p</span>}
+                  <span className="hidden sm:inline">{hasMultiQuality ? `${selectedQuality}p` : `${playbackSpeed}x`}</span>
                 </button>
 
                 {showSettingsMenu && (
-                  <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl bg-zinc-900 border border-zinc-800 p-2 shadow-2xl text-xs space-y-2 z-40">
+                  <div className={`absolute right-0 bottom-full mb-2 w-56 rounded-ui bg-paper text-ink p-3 ${MENU_SHADOW} text-small z-40`}>
                     {hasMultiQuality && (
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-zinc-400 px-2">Quality</span>
-                        <div className="mt-1 space-y-0.5">
+                      <div className="pb-3">
+                        <p className="px-1 pb-1 text-muted">Quality</p>
+                        {(["480", "360"] as const).map((q) => (
                           <button
-                            onClick={() => changeQuality("480")}
-                            className={`w-full px-2 py-1.5 rounded-md text-left flex items-center justify-between ${
-                              selectedQuality === "480" ? "bg-sky-500/20 text-sky-400 font-semibold" : "hover:bg-zinc-800 text-zinc-300"
+                            key={q}
+                            onClick={() => changeQuality(q)}
+                            className={`w-full min-h-[40px] px-2 rounded-ui text-left flex items-center justify-between transition-colors ${
+                              selectedQuality === q ? "bg-accent text-accent-ink font-medium" : "hover:bg-surface-2"
                             }`}
                           >
-                            <span>480p High Definition</span>
-                            {selectedQuality === "480" && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
-                          </button>
-                          <button
-                            onClick={() => changeQuality("360")}
-                            className={`w-full px-2 py-1.5 rounded-md text-left flex items-center justify-between ${
-                              selectedQuality === "360" ? "bg-sky-500/20 text-sky-400 font-semibold" : "hover:bg-zinc-800 text-zinc-300"
-                            }`}
-                          >
-                            <span>360p Fast / Low Data</span>
-                            {selectedQuality === "360" && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className={hasMultiQuality ? "border-t border-zinc-800 pt-2" : "pt-1"}>
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2">Speed</span>
-                      <div className="grid grid-cols-3 gap-1 mt-1">
-                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => changeSpeed(s)}
-                            className={`px-1.5 py-1 rounded text-center font-medium ${
-                              playbackSpeed === s ? "bg-sky-500 text-white font-bold" : "hover:bg-zinc-800 text-zinc-300"
-                            }`}
-                          >
-                            {s}x
+                            <span>{q === "480" ? "480p, sharper" : "360p, uses less data"}</span>
+                            {selectedQuality === q && <Check className="h-4 w-4" strokeWidth={2.5} />}
                           </button>
                         ))}
                       </div>
+                    )}
+                    <p className="px-1 pb-1 text-muted">Speed</p>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((sp) => (
+                        <button
+                          key={sp}
+                          onClick={() => changeSpeed(sp)}
+                          className={`min-h-[36px] rounded-ui tabular transition-colors ${
+                            playbackSpeed === sp ? "bg-accent text-accent-ink font-medium" : "bg-surface-2 hover:bg-surface"
+                          }`}
+                        >
+                          {sp}x
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Copy Stream Link */}
               <button
                 onClick={copyStreamLink}
-                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-zinc-300 hover:text-white"
-                title="Copy Stream Link (VLC / MX Player)"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-ui hover:bg-white/10 transition-colors"
+                title="Copy stream link (VLC, MX Player)"
+                aria-label="Copy stream link"
               >
-                {copiedLink ? (
-                  <Check className="h-4 w-4 text-emerald-400" strokeWidth={2.5} />
-                ) : (
-                  <Copy className="h-4 w-4" strokeWidth={2.2} />
-                )}
+                {copiedLink ? <Check className="h-4 w-4" strokeWidth={2.5} /> : <Copy className="h-4 w-4" strokeWidth={2.2} />}
               </button>
 
-              {/* Picture in Picture */}
               <button
                 onClick={togglePiP}
-                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-zinc-300 hover:text-white hidden sm:block"
-                title="Picture in Picture"
+                className="h-10 w-10 hidden sm:inline-flex items-center justify-center rounded-ui hover:bg-white/10 transition-colors"
+                title="Picture in picture"
+                aria-label="Picture in picture"
+                aria-pressed={isPiPActive}
               >
                 <PictureInPicture className="h-4 w-4" strokeWidth={2.2} />
               </button>
 
-              {/* Theater Mode */}
               <button
                 onClick={onToggleTheater}
-                className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${
-                  isTheaterMode ? "text-sky-400" : "text-zinc-300 hover:text-white"
-                } hidden md:block`}
-                title="Theater Mode (T)"
+                className={`h-10 w-10 hidden md:inline-flex items-center justify-center rounded-ui transition-colors ${
+                  isTheaterMode ? "bg-white/15" : "hover:bg-white/10"
+                }`}
+                title="Theatre mode (T)"
+                aria-label="Theatre mode"
+                aria-pressed={isTheaterMode}
               >
                 <Tv className="h-4 w-4" strokeWidth={2.2} />
               </button>
 
-              {/* Fullscreen */}
               <button
                 onClick={toggleFullscreen}
-                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-zinc-300 hover:text-white"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-ui hover:bg-white/10 transition-colors"
                 title="Fullscreen (F)"
+                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? (
-                  <Minimize className="h-4 w-4" strokeWidth={2.5} />
-                ) : (
-                  <Maximize className="h-4 w-4" strokeWidth={2.5} />
-                )}
+                {isFullscreen ? <Minimize className="h-4 w-4" strokeWidth={2.5} /> : <Maximize className="h-4 w-4" strokeWidth={2.5} />}
               </button>
             </div>
           </div>

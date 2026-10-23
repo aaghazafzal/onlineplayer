@@ -1,34 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Navbar } from "../../components/Navbar";
+import { SiteHeader } from "../../components/SiteHeader";
+import { SiteFooter } from "../../components/HomeSections";
+import { RevealObserver } from "../../components/RevealObserver";
 import { ShortcutsModal } from "../../components/ShortcutsModal";
 import { VideoPlayer, StreamData } from "../../components/VideoPlayer";
-import {
-  Search,
-  SlidersHorizontal,
-  X,
-  Play,
-  PlayCircle,
-  Download,
-  Share2,
-  Bookmark,
-  Flag,
-  Film,
-  Eye,
-  Calendar,
-  HardDrive,
-  Clock,
-  Sparkles,
-  ExternalLink,
-  Check,
-  AlertCircle,
-  Loader2,
-  RefreshCw,
-  TrendingUp,
-  Flame,
-  ArrowRight
-} from "lucide-react";
+import { Search, X, Play, Download, Share2, Bookmark, ExternalLink, Check, AlertCircle, RefreshCw } from "lucide-react";
 
 interface VideoItem {
   id: string | number;
@@ -91,9 +69,9 @@ export default function TeraBoxVideosPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("terabox_bookmarks");
-      if (saved) {
-        setBookmarkedIds(new Set(JSON.parse(saved)));
-      }
+      // Reading browser storage after hydration (the static HTML has no bookmarks)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved) setBookmarkedIds(new Set(JSON.parse(saved)));
     } catch (e) {
       console.warn("Failed to load bookmarks:", e);
     }
@@ -143,7 +121,8 @@ export default function TeraBoxVideosPage() {
         setTotalResults(data.total || filtered.length);
         setActiveQuery(query.trim());
       }
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as Error;
       console.error("Search fetch error:", err);
       setErrorMessage(err.message || "Failed to load videos. Please try again.");
       if (!append) {
@@ -156,9 +135,11 @@ export default function TeraBoxVideosPage() {
     }
   };
 
-  // Initial load
+  // Initial load: fetching from the network is what this effect is for
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchVideos("pushpa", selectedSort, selectedQuality, selectedDuration, 0, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on load
   }, []);
 
   // Handle Search Submission
@@ -270,7 +251,8 @@ export default function TeraBoxVideosPage() {
         thumbnail: item.thumbnail,
         surl: item.surl || undefined,
       });
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as Error;
       console.error("Modal stream resolve error:", err);
       setModalError(err.message || "Failed to load stream. Please try again.");
     } finally {
@@ -301,486 +283,284 @@ export default function TeraBoxVideosPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#f8f9fc] dark:bg-[#090a0f] text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
-      {/* Top Header Navigation */}
-      <Navbar onOpenShortcuts={() => setIsShortcutsOpen(true)} />
+  const closeModal = () => {
+    setActiveModalVideo(null);
+    setModalStreamData(null);
+  };
+  const shareLinkOf = (item: VideoItem) => item.shareUrl || (item.surl ? `https://terabox.com/s/${item.surl}` : "");
 
-      {/* Main Content Container */}
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-        
-        {/* Top Header Row: Browse Title & High-Tech Search Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          
-          {/* Left Title: Browse with Vertical Accent Bar */}
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1.5 rounded-full bg-blue-600 shadow-sm shadow-blue-500/50" />
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-950 dark:text-white">
-              Browse
-            </h1>
+  const QUALITIES = ["all", "1080p", "720p", "480p"] as const;
+  const SORTS = [
+    { id: "trending", label: "Most watched" },
+    { id: "latest", label: "Newest" },
+  ] as const;
+
+  return (
+    <div id="top" className="min-h-svh bg-bg text-ink flex flex-col">
+      <RevealObserver />
+      <SiteHeader onOpenShortcuts={() => setIsShortcutsOpen(true)} />
+
+      <main className="flex-1 frame pt-10 lg:pt-16 pb-[var(--section-gap)]">
+        {/* Title and search */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6 items-end">
+          <div className="lg:col-span-12">
+            <h1 className="text-display leading-[0.95] max-w-[12ch]">TeraBox videos to play</h1>
+            <p className="mt-5 max-w-[42ch] text-body">
+              Search public TeraBox shares and play any of them here in full, or save it as MP4.
+            </p>
           </div>
 
-          {/* Right: Search Input Capsule (Exact IteraPlay Style) */}
-          <form
-            onSubmit={handleSearchSubmit}
-            className="relative flex-1 max-w-xl flex items-center bg-white dark:bg-[#13141f] border border-zinc-200 dark:border-[#242536] rounded-2xl p-1.5 shadow-xs focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all"
-          >
-            <div className="pl-3.5 pr-2 text-zinc-400">
-              <SlidersHorizontal className="h-4 w-4" strokeWidth={2.2} />
-            </div>
-
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search TeraBox videos, movies, anime..."
-              className="w-full bg-transparent text-sm font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none px-1"
-            />
-
-            {/* Clear Button */}
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#202030] transition-colors cursor-pointer mr-1"
-                title="Clear input"
-              >
-                <X className="h-4 w-4" />
+          <form onSubmit={handleSearchSubmit} className="lg:col-span-8" role="search">
+            <label htmlFor="video-search" className="sr-only">
+              Search videos
+            </label>
+            <div className="flex items-stretch gap-2 rounded-ui bg-paper p-2 focus-within:outline-3 focus-within:outline-accent">
+              <Search className="h-5 w-5 self-center ml-2 text-muted shrink-0" strokeWidth={2.4} />
+              <input
+                id="video-search"
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title"
+                className="min-w-0 flex-1 bg-transparent px-2 text-body placeholder:text-muted focus:outline-none"
+              />
+              <button type="submit" className="btn btn-accent min-h-[48px]">
+                Search
               </button>
-            )}
-
-            {/* Submit Search Button */}
-            <button
-              type="submit"
-              className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-xs shadow-blue-600/30 transition-all cursor-pointer active:scale-95"
-            >
-              <Search className="h-3.5 w-3.5" strokeWidth={2.4} />
-              <span className="hidden xs:inline">Search</span>
-            </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-small">
+              <span className="text-muted">Try</span>
+              {POPULAR_SEARCHES.map((tag) => (
+                <button key={tag} type="button" onClick={() => handleTagClick(tag)} className="link cursor-pointer">
+                  {tag}
+                </button>
+              ))}
+            </div>
           </form>
         </div>
 
-        {/* Popular Quick-Search Tags */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="text-zinc-400 dark:text-zinc-500 font-bold flex items-center gap-1.5 shrink-0">
-            <Flame className="h-3.5 w-3.5 text-amber-500" />
-            Trending:
-          </span>
-          {POPULAR_SEARCHES.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => handleTagClick(tag)}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
-                activeQuery.toLowerCase() === tag.toLowerCase()
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-white dark:bg-[#14141f] text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-[#222230] hover:border-blue-500/50 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-
-        {/* Sub-Header Banner: Found X Results + Clear All (Exact IteraPlay Style) */}
-        <div className="flex items-center justify-between pt-2 pb-1 border-t border-zinc-200/80 dark:border-white/[0.06]">
-          {/* Left: Found X Results indicator */}
-          <div className="flex items-center gap-2.5">
-            <div className="h-5 w-1 rounded-full bg-amber-500" />
-            <h2 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white tracking-tight">
-              {activeQuery ? (
-                <>
-                  Found <span className="text-blue-500">{totalResults}</span> Results for &ldquo;{activeQuery}&rdquo;
-                </>
-              ) : (
-                <>
-                  Trending Videos <span className="text-zinc-400">({totalResults})</span>
-                </>
-              )}
-            </h2>
-          </div>
-
-          {/* Right: Clear All Button */}
-          {activeQuery && (
-            <button
-              onClick={handleClearAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer"
-            >
-              <X className="h-3.5 w-3.5" />
-              <span>Clear All</span>
-            </button>
-          )}
-        </div>
-
-        {/* Filter Pills Row (Sort & Quality Pills) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white/70 dark:bg-[#11121a]/80 backdrop-blur-md p-2.5 rounded-2xl border border-zinc-200 dark:border-white/[0.06]">
-          {/* Quality Filters */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-zinc-400 dark:text-zinc-500 font-bold px-1 hidden sm:inline">
-              Quality:
-            </span>
-            {(["all", "1080p", "720p", "480p"] as const).map((q) => (
-              <button
-                key={q}
-                onClick={() => handleFilterChange(selectedSort, q, selectedDuration)}
-                className={`px-3 py-1.5 rounded-xl font-bold uppercase transition-all cursor-pointer ${
-                  selectedQuality === q
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1a1b28]"
-                }`}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-
-          {/* Sort Filters */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-zinc-400 dark:text-zinc-500 font-bold px-1 hidden sm:inline">
-              Sort:
-            </span>
-            {(["trending", "latest"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => handleFilterChange(s, selectedQuality, selectedDuration)}
-                className={`px-3 py-1.5 rounded-xl font-bold capitalize transition-all cursor-pointer ${
-                  selectedSort === s
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1a1b28]"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Error Alert Box */}
-        {errorMessage && (
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 flex items-center justify-between text-sm font-semibold">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 shrink-0" />
-              <span>{errorMessage}</span>
+        {/* Result count and filters */}
+        <div className="mt-14 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <h2 className="text-lead font-semibold tracking-[-0.02em]" aria-live="polite">
+            {isLoading
+              ? "Searching"
+              : activeQuery
+                ? `${totalResults.toLocaleString()} videos for “${activeQuery}”`
+                : `${totalResults.toLocaleString()} videos`}
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <div role="radiogroup" aria-label="Quality" className="flex gap-1 rounded-ui bg-surface p-1">
+              {QUALITIES.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedQuality === q}
+                  onClick={() => handleFilterChange(selectedSort, q, selectedDuration)}
+                  className={`min-h-[40px] px-3 rounded-[4px] text-small transition-colors ${
+                    selectedQuality === q ? "bg-ink text-paper" : "hover:bg-surface-2"
+                  }`}
+                >
+                  {q === "all" ? "Any quality" : q}
+                </button>
+              ))}
             </div>
+            <div role="radiogroup" aria-label="Sort" className="flex gap-1 rounded-ui bg-surface p-1">
+              {SORTS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedSort === s.id}
+                  onClick={() => handleFilterChange(s.id, selectedQuality, selectedDuration)}
+                  className={`min-h-[40px] px-3 rounded-[4px] text-small transition-colors ${
+                    selectedSort === s.id ? "bg-ink text-paper" : "hover:bg-surface-2"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            {activeQuery && (
+              <button type="button" onClick={handleClearAll} className="link text-small ml-2 cursor-pointer">
+                Clear search
+              </button>
+            )}
+          </div>
+        </div>
+
+        {errorMessage && (
+          <div role="alert" className="mt-6 rounded-ui bg-danger-soft p-5 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-body">{errorMessage}</p>
             <button
+              type="button"
               onClick={() => fetchVideos(activeQuery, selectedSort, selectedQuality, selectedDuration, 0, false)}
-              className="px-3 py-1 rounded-xl bg-red-500 text-white font-bold text-xs hover:bg-red-600 transition-colors"
+              className="btn btn-ink min-h-[44px] text-small"
             >
-              Retry
+              <RefreshCw className="h-4 w-4" strokeWidth={2.4} /> Try again
             </button>
           </div>
         )}
 
-        {/* Video Cards Grid */}
+        {/* Results */}
         {isLoading ? (
-          // Skeleton Loading Shimmer Grid
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-2xl overflow-hidden bg-white dark:bg-[#12131d] border border-zinc-200 dark:border-white/[0.06] p-3 space-y-3 animate-pulse"
-              >
-                <div className="aspect-video w-full rounded-xl bg-zinc-200 dark:bg-zinc-800/60" />
-                <div className="h-4 w-4/5 rounded-md bg-zinc-200 dark:bg-zinc-800/60" />
-                <div className="h-3 w-1/3 rounded-md bg-zinc-200 dark:bg-zinc-800/60" />
-                <div className="h-9 w-full rounded-xl bg-zinc-200 dark:bg-zinc-800/60" />
-              </div>
+          <ul className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-8" aria-hidden="true">
+            {Array.from({ length: 8 }, (_, i) => (
+              <li key={i}>
+                <div className="aspect-video rounded-ui bg-surface" />
+                <div className="mt-3 h-5 w-4/5 rounded-[4px] bg-surface" />
+                <div className="mt-2 h-4 w-2/5 rounded-[4px] bg-surface" />
+              </li>
             ))}
-          </div>
-        ) : videoList.length === 0 ? (
-          // Empty State
-          <div className="py-20 text-center space-y-4 max-w-md mx-auto">
-            <div className="h-16 w-16 mx-auto rounded-3xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
-              <Film className="h-8 w-8" strokeWidth={2} />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-zinc-950 dark:text-white">
-                No videos found
-              </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                We couldn&apos;t find any TeraBox videos matching &ldquo;{activeQuery}&rdquo;. Try another search term or browse popular tags.
-              </p>
-            </div>
-            <div className="pt-2 flex flex-wrap justify-center gap-2">
-              {POPULAR_SEARCHES.slice(0, 5).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => handleTagClick(t)}
-                  className="px-3 py-1 rounded-xl bg-zinc-100 dark:bg-[#1a1b26] text-xs font-bold text-blue-500 hover:bg-blue-600 hover:text-white transition-all cursor-pointer"
-                >
+          </ul>
+        ) : videoList.length === 0 && !errorMessage ? (
+          <div className="mt-10 rounded-ui bg-paper p-8 sm:p-12">
+            <h3 className="text-lead font-semibold">Nothing found{activeQuery ? ` for “${activeQuery}”` : ""}</h3>
+            <p className="mt-2 text-body text-muted">Try a shorter title, or one of these:</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {POPULAR_SEARCHES.slice(0, 6).map((t) => (
+                <button key={t} type="button" onClick={() => handleTagClick(t)} className="btn btn-quiet min-h-[44px] text-small">
                   {t}
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          // Video Cards Grid (Exact IteraPlay / TeraViralHub Layout)
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
-            {videoList.map((item) => {
-              const isBookmarked = bookmarkedIds.has(item.id);
-              const isCopied = copiedId === item.id;
-              const qualityBadgeColor =
-                item.quality === "1080P"
-                  ? "bg-[#2563eb] text-white"
-                  : item.quality === "720P"
-                  ? "bg-[#0284c7] text-white"
-                  : "bg-[#6366f1] text-white";
-
+          <ul className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-8">
+            {videoList.map((item, i) => {
+              const saved = bookmarkedIds.has(item.id);
               return (
-                <article
-                  key={item.id}
-                  className="group relative flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-[#12131d] border border-zinc-200 dark:border-white/[0.06] hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300"
-                >
-                  {/* Thumbnail Container (16:9) */}
-                  <div 
+                <li key={`${item.id}-${i}`} data-reveal style={{ "--i": i % 4 } as React.CSSProperties}>
+                  <button
+                    type="button"
                     onClick={() => handlePlayModal(item)}
-                    className="relative aspect-video w-full overflow-hidden bg-zinc-900 cursor-pointer"
+                    className="group relative block w-full aspect-video overflow-clip rounded-ui bg-stage"
+                    aria-label={`Play ${item.title}`}
                   >
-                    <img
-                      src={item.thumbnail}
-                      alt={item.title}
-                      loading="lazy"
-                      onError={(e) => {
-                        // Fallback image on broken thumbnail
-                        (e.target as HTMLImageElement).src =
-                          "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&auto=format&fit=crop&q=60";
-                      }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
-
-                    {/* Top-Left Quality Badge */}
-                    <div className="absolute top-2.5 left-2.5">
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-md ${qualityBadgeColor}`}>
-                        {item.quality}
-                      </span>
-                    </div>
-
-                    {/* Top-Right Views Badge */}
-                    <div className="absolute top-2.5 right-2.5">
-                      <span className="flex items-center gap-1 bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
-                        <Eye className="h-3 w-3" />
-                        {item.views}
-                      </span>
-                    </div>
-
-                    {/* Bottom-Left Duration Badge */}
-                    <div className="absolute bottom-2.5 left-2.5">
-                      <span className="flex items-center gap-1 bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono font-bold px-2 py-0.5 rounded-md shadow-xs">
-                        <Clock className="h-3 w-3 text-blue-400" />
-                        {item.duration}
-                      </span>
-                    </div>
-
-                    {/* Bottom-Right File Size Badge */}
-                    <div className="absolute bottom-2.5 right-2.5">
-                      <span className="bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono font-bold px-2 py-0.5 rounded-md shadow-xs">
-                        {item.size}
-                      </span>
-                    </div>
-
-                    {/* Hover Center Play Button */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                      <div className="h-12 w-12 rounded-full bg-blue-600/90 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 transform scale-90 group-hover:scale-100 transition-transform">
-                        <Play className="h-5 w-5 fill-white ml-0.5" />
-                      </div>
-                    </div>
+                    {item.thumbnail ? (
+                      <img
+                        src={item.thumbnail}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-out)] group-hover:scale-[1.04]"
+                      />
+                    ) : null}
+                    <span className="absolute inset-0 m-auto inline-flex h-12 w-12 items-center justify-center rounded-ui bg-accent text-accent-ink opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
+                      <Play className="h-5 w-5 fill-current ml-0.5" strokeWidth={2.2} />
+                    </span>
+                    {item.duration && (
+                      <span className="absolute bottom-2 right-2 rounded-[4px] bg-stage px-2 py-0.5 text-small text-stage-ink tabular">{item.duration}</span>
+                    )}
+                  </button>
+                  <h3 className="mt-3 text-body font-medium leading-snug line-clamp-2 [overflow-wrap:anywhere]">
+                    <button type="button" onClick={() => handlePlayModal(item)} className="text-left hover:underline underline-offset-4 cursor-pointer">
+                      {item.title}
+                    </button>
+                  </h3>
+                  <p className="mt-1 text-small text-muted">
+                    {[item.quality, item.size, item.views ? `${item.views.toLocaleString()} views` : "", formatDate(item.createdAt)].filter(Boolean).join(" · ")}
+                  </p>
+                  <div className="mt-3 flex gap-1">
+                    <button type="button" onClick={() => handleDownload(item)} className="btn btn-quiet min-h-[40px] flex-1 px-2 text-small">
+                      <Download className="h-4 w-4" strokeWidth={2.4} /> Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyLink(item)}
+                      className="btn btn-quiet min-h-[40px] flex-1 px-2 text-small"
+                      aria-label={`Copy the share link of ${item.title}`}
+                    >
+                      {copiedId === item.id ? <Check className="h-4 w-4" strokeWidth={2.6} /> : <Share2 className="h-4 w-4" strokeWidth={2.4} />}
+                      {copiedId === item.id ? "Copied" : "Link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleBookmark(item)}
+                      aria-pressed={saved}
+                      aria-label={saved ? `Remove ${item.title} from saved` : `Save ${item.title} for later`}
+                      className={`btn min-h-[40px] w-10 px-0 ${saved ? "btn-ink" : "btn-quiet"}`}
+                    >
+                      <Bookmark className={`h-4 w-4 ${saved ? "fill-current" : ""}`} strokeWidth={2.4} />
+                    </button>
                   </div>
-
-                  {/* Card Body Info */}
-                  <div className="p-3.5 flex flex-col justify-between flex-1 space-y-3">
-                    <div>
-                      {/* Video Title */}
-                      <h3
-                        onClick={() => handlePlayModal(item)}
-                        title={item.title}
-                        className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 hover:text-blue-500 cursor-pointer transition-colors leading-snug"
-                      >
-                        {item.title}
-                      </h3>
-
-                      {/* Date */}
-                      <p className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 mt-1">
-                        {formatDate(item.createdAt)}
-                      </p>
-                    </div>
-
-                    {/* Card Action Buttons (Exact IteraPlay Row: Bookmark, Download, Share, Flag) */}
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-100 dark:border-white/[0.05]">
-                      
-                      {/* 1. Bookmark Button */}
-                      <button
-                        onClick={() => handleToggleBookmark(item)}
-                        className={`h-9 w-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 ${
-                          isBookmarked
-                            ? "bg-amber-500/15 border-amber-500/30 text-amber-500"
-                            : "bg-zinc-100 dark:bg-[#181926] border-zinc-200 dark:border-[#262738] text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white"
-                        }`}
-                        title={isBookmarked ? "Bookmarked" : "Bookmark Video"}
-                      >
-                        <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-amber-500" : ""}`} />
-                      </button>
-
-                      {/* 2. Download Button (Green) */}
-                      <button
-                        onClick={() => handleDownload(item)}
-                        className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/30 transition-all cursor-pointer active:scale-95"
-                        title="Download Video via OnlinePlayer Engine"
-                      >
-                        <Download className="h-4 w-4" strokeWidth={2.4} />
-                        <span className="hidden xs:inline">Download</span>
-                      </button>
-
-                      {/* 3. Share Button (Blue) */}
-                      <button
-                        onClick={() => handleCopyLink(item)}
-                        className="h-9 w-9 rounded-xl bg-blue-600/15 hover:bg-blue-600 border border-blue-500/30 text-blue-500 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0"
-                        title={isCopied ? "Link Copied!" : "Share / Copy Link"}
-                      >
-                        {isCopied ? (
-                          <Check className="h-4 w-4 text-emerald-400" />
-                        ) : (
-                          <Share2 className="h-4 w-4" />
-                        )}
-                      </button>
-
-                      {/* 4. Play in Full Player Page */}
-                      <a
-                        href={item.shareUrl ? `/?url=${encodeURIComponent(item.shareUrl)}` : item.surl ? `/?url=${encodeURIComponent(`https://terabox.com/s/${item.surl}`)}` : "#"}
-                        className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-[#181926] border border-zinc-200 dark:border-[#262738] text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:border-blue-500/40 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0"
-                        title="Open in Full OnlinePlayer Page"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </div>
-                  </div>
-                </article>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
 
-        {/* Load More Button */}
         {!isLoading && videoList.length > 0 && videoList.length < totalResults && (
-          <div className="pt-6 text-center">
-            <button
-              onClick={handleLoadMore}
-              disabled={isLoadingMore}
-              className="px-6 py-3 rounded-2xl bg-white dark:bg-[#13141f] border border-zinc-200 dark:border-[#242536] hover:border-blue-500 text-sm font-bold text-zinc-800 dark:text-zinc-200 hover:text-blue-500 shadow-sm transition-all cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-2 mx-auto"
-            >
+          <div className="mt-12 flex justify-center">
+            <button type="button" onClick={handleLoadMore} disabled={isLoadingMore} className="btn btn-ink min-h-[56px] px-8">
               {isLoadingMore ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                  <span>Loading more videos...</span>
-                </>
-              ) : (
-                <>
-                  <span>Load More Videos ({videoList.length} of {totalResults})</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
+                <span className="h-5 w-5 rounded-full border-2 border-current border-r-transparent animate-[spin_0.8s_linear_infinite]" />
+              ) : null}
+              {isLoadingMore ? "Loading" : `Show more (${videoList.length} of ${totalResults.toLocaleString()})`}
             </button>
           </div>
         )}
       </main>
 
-      {/* In-Page Video Player Modal */}
-      {activeModalVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-4xl bg-white dark:bg-[#0f1017] rounded-3xl overflow-hidden border border-zinc-200 dark:border-white/[0.08] shadow-2xl flex flex-col max-h-[90vh]">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-[#1e202e]">
-              <div className="flex items-center gap-2.5 truncate pr-3">
-                <PlayCircle className="h-5 w-5 text-blue-500 shrink-0" />
-                <h3 className="text-sm sm:text-base font-extrabold text-zinc-950 dark:text-white truncate">
-                  {activeModalVideo.title}
-                </h3>
-              </div>
+      <SiteFooter />
 
-              <button
-                onClick={() => {
-                  setActiveModalVideo(null);
-                  setModalStreamData(null);
-                }}
-                className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#1a1b28] transition-colors cursor-pointer"
-                title="Close Player"
-              >
-                <X className="h-5 w-5" />
+      {/* In-page player */}
+      {activeModalVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          onClick={(e) => e.target === e.currentTarget && closeModal()}
+          onKeyDown={(e) => e.key === "Escape" && closeModal()}
+        >
+          <div className="w-full max-w-5xl rounded-ui bg-paper overflow-clip flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between gap-4 px-4 sm:px-5 min-h-[60px]">
+              <h2 id="modal-title" className="text-body font-medium truncate">
+                {activeModalVideo.title}
+              </h2>
+              <button onClick={closeModal} className="btn btn-quiet min-h-[40px] w-10 px-0 shrink-0" aria-label="Close player" autoFocus>
+                <X className="h-5 w-5" strokeWidth={2.4} />
               </button>
             </div>
 
-            {/* Modal Player Content */}
-            <div className="relative aspect-video w-full bg-black">
+            <div className="relative aspect-video w-full bg-stage text-stage-ink">
               {modalLoading ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 text-white">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                  <p className="text-xs font-bold tracking-wider uppercase text-zinc-400">
-                    Resolving full video stream...
-                  </p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <span className="h-8 w-8 rounded-full border-[3px] border-current border-r-transparent animate-[spin_0.8s_linear_infinite]" />
+                  <p className="text-small text-stage-muted">Finding the full video</p>
                 </div>
               ) : modalError ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 text-red-400">
-                  <AlertCircle className="h-10 w-10" />
-                  <p className="text-sm font-bold">{modalError}</p>
-                  <a
-                    href={`/?url=${encodeURIComponent(`https://terabox.com/s/${activeModalVideo.surl}`)}`}
-                    className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs"
-                  >
-                    Open in Full OnlinePlayer
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+                  <AlertCircle className="h-8 w-8" strokeWidth={2.2} />
+                  <p className="text-body max-w-[44ch]">{modalError}</p>
+                  <a href={`/?url=${encodeURIComponent(shareLinkOf(activeModalVideo))}`} className="btn btn-accent min-h-[48px] text-small">
+                    Open in the full player
                   </a>
                 </div>
               ) : modalStreamData ? (
-                <VideoPlayer
-                  streamData={modalStreamData}
-                  isTheaterMode={false}
-                  onToggleTheater={() => {}}
-                />
+                <VideoPlayer streamData={modalStreamData} isTheaterMode={false} onToggleTheater={() => {}} />
               ) : null}
             </div>
 
-            {/* Modal Footer Controls */}
-            <div className="p-4 bg-zinc-50 dark:bg-[#12131d] flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 font-mono font-bold">
-                <span>Duration: {activeModalVideo.duration}</span>
-                <span>•</span>
-                <span>Size: {activeModalVideo.size}</span>
-                <span>•</span>
-                <span className="uppercase text-blue-500">{activeModalVideo.quality}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* Download via OnlinePlayer Button */}
-                <button
-                  onClick={() => handleDownload(activeModalVideo)}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 cursor-pointer"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+              <p className="text-small text-muted">
+                {[activeModalVideo.duration, activeModalVideo.size, activeModalVideo.quality].filter(Boolean).join(" · ")}
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => handleDownload(activeModalVideo)} className="btn btn-ink min-h-[44px] text-small">
+                  <Download className="h-4 w-4" strokeWidth={2.4} /> Download
                 </button>
-
-                {/* Open in Main Player Page */}
-                <a
-                  href={`/?url=${encodeURIComponent(activeModalVideo.shareUrl || `https://terabox.com/s/${activeModalVideo.surl}`)}`}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black flex items-center gap-1.5 shadow-sm shadow-blue-600/30"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>Open Full Page</span>
+                <a href={`/?url=${encodeURIComponent(shareLinkOf(activeModalVideo))}`} className="btn btn-accent min-h-[44px] text-small">
+                  <ExternalLink className="h-4 w-4" strokeWidth={2.4} /> Open full page
                 </a>
               </div>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* Keyboard Shortcuts Modal */}
-      <ShortcutsModal
-        isOpen={isShortcutsOpen}
-        onClose={() => setIsShortcutsOpen(false)}
-      />
+      <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </div>
   );
 }

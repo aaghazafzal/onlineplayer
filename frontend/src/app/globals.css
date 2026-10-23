@@ -1,49 +1,295 @@
 @import "tailwindcss";
 
+/* Dark mode follows the .dark class on <html> (set before paint in layout.tsx) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   Tokens. Direction "One motif" (seed 1631181455): the stream's own segments
+   are the one shape; pastel fields swap per chapter; ink stays near-black;
+   dark teal is the only accent. Components use the semantic names below, so
+   light and dark both come from here.
+   ========================================================================== */
 :root {
-  --background: #f4f4f7;
-  --foreground: #09090b;
-  --card-bg: #ffffff;
-  --card-inner: #f8fafc;
-  --card-border: #e4e4e7;
+  --bg: #c3cbe5;
+  --paper: #f3f4fa;
+  --surface: #d0d6eb;
+  --surface-2: #dde1f0;
+  --ink: #141414;
+  --muted: #4a5068;
+  --accent: #0f5257;
+  --accent-ink: #ffffff;
+  --accent-soft: #cfe3e1;
+  --field-1: #c3cbe5;
+  --field-2: #efd3da;
+  --field-3: #e6dccd;
+  --field-4: #cfd3cb;
+  --field-5: #f9cdbd;
+  --stage: #141414; /* the one near-black box: players */
+  --stage-ink: #f3f4fa;
+  --stage-muted: #a9aec4;
+  --danger: #9b1c1c;
+  --danger-soft: #f6d5d5;
+
+  --radius: 6px;
+  --margin: clamp(16px, 2.2vw, 32px);
+  --section-gap: clamp(88px, 11vw, 200px);
+
+  --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+  --step-head: clamp(2rem, 1.3rem + 3.2vw, 4rem);
+  --step-display: clamp(3rem, 1.6rem + 5.4vw, 6.5rem);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --t-press: 140ms;
+  --t-hover: 180ms;
+  --t-ui: 240ms;
+  --t-reveal: 800ms;
+
+  color-scheme: light;
 }
 
 .dark {
-  --background: #0e0e11;
-  --foreground: #f4f4f5;
-  --card-bg: #18181f;
-  --card-inner: #121217;
-  --card-border: #262633;
+  --bg: #15171d;
+  --paper: #1d2029;
+  --surface: #232733;
+  --surface-2: #2b3040;
+  --ink: #eef0f6;
+  --muted: #a9afc4;
+  --accent: #6cc3bc;
+  --accent-ink: #082221;
+  --accent-soft: #1d3a39;
+  --field-1: #2b3354;
+  --field-2: #4a2f3a;
+  --field-3: #3a3226;
+  --field-4: #2c372e;
+  --field-5: #4a3027;
+  --stage: #0b0c10;
+  --stage-ink: #eef0f6;
+  --stage-muted: #9aa0b6;
+  --danger: #f2a7a7;
+  --danger-soft: #3a1d1f;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-field-1: var(--field-1);
+  --color-field-2: var(--field-2);
+  --color-field-3: var(--field-3);
+  --color-field-4: var(--field-4);
+  --color-field-5: var(--field-5);
+  --color-stage: var(--stage);
+  --color-stage-ink: var(--stage-ink);
+  --color-stage-muted: var(--stage-muted);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-sans: "Chillax", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --radius-ui: var(--radius);
+
+  --text-small: var(--step-small);
+  --text-body: var(--step-body);
+  --text-lead: var(--step-lead);
+  --text-head: var(--step-head);
+  --text-display: var(--step-display);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  transition: background-color 0.2s ease, color 0.2s ease;
-  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--step-body);
+  line-height: 1.5;
+  min-height: 100svh;
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom sleek scrollbars */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+h1, h2, h3, h4 {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-wrap: balance;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+p { text-wrap: pretty; }
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: #272733;
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+@layer components {
+/* Page frame: one pair of margins everywhere */
+.frame {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: var(--margin);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+
+/* ==========================================================================
+   The motif: a stream cut into segments. A row of filled blocks with 4-6px
+   gaps; the played part is ink, the rest is paper.
+   ========================================================================== */
+.segments {
+  display: flex;
+  gap: 4px;
 }
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f50;
+.segments > i {
+  display: block;
+  flex: 1 1 0;
+  border-radius: 2px;
+  background: var(--ink);
 }
+.segments > i.rest { background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.on-stage .segments > i { background: var(--stage-ink); }
+.on-stage .segments > i.rest { background: color-mix(in srgb, var(--stage-ink) 22%, transparent); }
+.on-stage .segments > i.cut { background: var(--accent); }
+
+/* The hero band plays through its segments once on load */
+@media (prefers-reduced-motion: no-preference) {
+  html.js .segments.play > i {
+    animation: segment-play 2.4s var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+}
+@keyframes segment-play {
+  from { background: color-mix(in srgb, var(--ink) 16%, transparent); }
+}
+
+/* Buttons: one shape (the segment), one radius */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  min-height: 52px;
+  padding: 0 1.4em;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: var(--step-body);
+  transition: background-color var(--t-hover) ease, color var(--t-hover) ease, transform var(--t-press) var(--ease-out);
+  cursor: pointer;
+  user-select: none;
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-accent { background: var(--accent); color: var(--accent-ink); }
+.btn-accent:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 86%, var(--ink)); }
+.btn-ink { background: var(--ink); color: var(--paper); }
+.btn-ink:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 82%, var(--accent)); }
+.btn-quiet { background: var(--surface-2); color: var(--ink); }
+.btn-quiet:hover:not(:disabled) { background: color-mix(in srgb, var(--surface-2) 70%, var(--ink) 12%); }
+
+/* Underline-on-hover text links */
+.link {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+  text-decoration-color: transparent;
+  transition: text-decoration-color var(--t-hover) ease;
+}
+.link:hover, .link:focus-visible { text-decoration-color: currentColor; }
+
+}
+
+/* ==========================================================================
+   Motion. Content is visible without JS; hidden start states only apply
+   under html.js and prefers-reduced-motion: no-preference.
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  html.js [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity var(--t-reveal) var(--ease-expo), transform var(--t-reveal) var(--ease-expo);
+    transition-delay: calc(var(--i, 0) * 80ms);
+  }
+  html.js [data-reveal="scale"] { transform: scale(0.96); }
+  html.js [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Headline lines rise out of a mask on load */
+  html.js .rise-line { display: block; overflow: clip; padding-bottom: 0.08em; }
+  html.js .rise-line > span {
+    display: block;
+    animation: line-rise 1s var(--ease-expo) both;
+    animation-delay: calc(120ms + var(--i, 0) * 90ms);
+  }
+
+  .drift { animation: drift 18s var(--ease-in-out) infinite alternate; }
+}
+
+@keyframes line-rise {
+  from { transform: translateY(105%); }
+}
+@keyframes drift {
+  from { transform: scale(1.06) translate3d(-1.5%, 0, 0); }
+  to { transform: scale(1.06) translate3d(1.5%, -1%, 0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Crossfading stage (hero + showcase) */
+/* Hidden slides also leave the hit-test and reading order once faded */
+.xfade { transition: opacity 1.6s ease, visibility 0s linear 0s; }
+.xfade[aria-hidden="true"] { visibility: hidden; transition: opacity 1.6s ease, visibility 0s linear 1.6s; }
+@media (prefers-reduced-motion: reduce) {
+  .xfade { transition: none; }
+}
+
+@layer components {
+/* FAQ / list accordions: plus becomes minus */
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+.plus { position: relative; width: 16px; height: 16px; flex: none; }
+.plus::before, .plus::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto 0;
+  height: 3px;
+  margin-top: -1.5px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform var(--t-ui) var(--ease-out);
+}
+.plus::after { transform: rotate(90deg); }
+details[open] > summary .plus::after { transform: rotate(0deg); }
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 8px; }
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

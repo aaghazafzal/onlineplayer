@@ -1,27 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  RotateCw, 
-  Volume2, 
-  VolumeX, 
-  Download, 
-  Copy, 
-  Check, 
-  ExternalLink, 
-  Sparkles, 
-  ShieldCheck, 
-  Radio, 
-  Music, 
-  Disc, 
-  Repeat, 
-  Sliders, 
-  Loader2,
-  Share2
-} from "lucide-react";
+import { Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX, Download, Copy, Check, ExternalLink, Repeat, Share2 } from "lucide-react";
+import { Segments } from "./Segments";
 
 export interface SpotifyStreamOption {
   quality: string;
@@ -30,6 +11,8 @@ export interface SpotifyStreamOption {
   streamUrl: string;
   directUrl: string;
   downloadUrl: string;
+  /** Same audio through the Worker, used if the CDN refuses this browser */
+  proxyUrl?: string;
 }
 
 /** The full-length recording the worker matched to the Spotify track. */
@@ -98,29 +81,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [downloadingQuality, setDownloadingQuality] = useState<string | null>(null);
+  const [useProxy, setUseProxy] = useState(false);
 
-  // Auto-start download if user clicked Download in URL bar
-  useEffect(() => {
-    if (autoStartDownload && activeStream?.downloadUrl) {
-      handleTriggerDownload(activeStream);
-    }
-  }, [autoStartDownload]);
-
-  // Sync active stream when trackData changes
-  useEffect(() => {
-    const stream = trackData.streams?.[0] || {
-      quality: "320 kbps (Ultra HD)",
-      bitrate: "320k",
-      codec: "AAC / MP4",
-      streamUrl: trackData.streamUrl,
-      directUrl: trackData.directStreamUrl,
-      downloadUrl: trackData.streamUrl,
-    };
-    setActiveStream(stream);
-    setCurrentTime(0);
-    setIsPlaying(false);
-    setDuration(trackData.duration || 0);
-  }, [trackData]);
+  // The page remounts this component per track (key={trackId}), so state starts fresh.
 
   // Audio element listeners
   useEffect(() => {
@@ -266,6 +229,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }, 2000);
   };
 
+  // Auto-start the download when the visitor pressed Download in the link box
+  useEffect(() => {
+    // Starting a download is the side effect this runs for; it marks the button busy
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (autoStartDownload && activeStream?.downloadUrl) handleTriggerDownload(activeStream);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount
+  }, [autoStartDownload]);
+
   // Copy Stream Link
   const handleCopyStream = async () => {
     try {
@@ -297,334 +268,125 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  const isPreview = !trackData.isFullLength;
+  const meta = [trackData.album, trackData.year].filter(Boolean).join(" · ");
+
   return (
-    <div className="w-full max-w-5xl lg:max-w-6xl mx-auto space-y-6">
-      
-      {/* Hidden Native Audio Element */}
+    <article className="w-full rounded-ui bg-paper overflow-clip" aria-label={`${trackData.title} by ${trackData.artist}`}>
       <audio
         ref={audioRef}
-        src={activeStream.streamUrl}
+        src={useProxy ? activeStream.proxyUrl || activeStream.streamUrl : activeStream.streamUrl}
         preload="metadata"
         loop={isLooping}
+        onError={() => {
+          // CDN refused this browser: fall back once to the Worker proxy
+          if (!useProxy && activeStream.proxyUrl) setUseProxy(true);
+        }}
       />
 
-      {/* Main Music Player Card */}
-      <div className="relative overflow-hidden rounded-[32px] bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] shadow-2xl transition-all duration-200">
-        
-        {/* Glow Accent behind player */}
-        <div className="absolute top-0 right-0 -mr-24 -mt-24 w-96 h-96 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-24 -mb-24 w-96 h-96 rounded-full bg-blue-500/10 dark:bg-blue-500/15 blur-3xl pointer-events-none" />
+      <div className="grid grid-cols-1 lg:grid-cols-12">
+        {/* Cover */}
+        <div className="lg:col-span-5 bg-stage p-4 sm:p-6 lg:p-8">
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="group relative block w-full max-w-[260px] sm:max-w-[360px] lg:max-w-none mx-auto aspect-square overflow-clip rounded-ui"
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
+            <img
+              src={trackData.cover || "/providers/spotify.png"}
+              alt={`Cover of ${trackData.album || trackData.title}`}
+              className="h-full w-full object-cover transition-transform duration-700 ease-[var(--ease-out)] group-hover:scale-[1.03]"
+            />
+          </button>
+        </div>
 
-        <div className="relative p-6 sm:p-10 md:p-12 space-y-8">
-          
-          {/* Top Header Pill Row */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-zinc-200 dark:border-[#262633]">
-            <div className="flex items-center gap-2.5">
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#1DB954]/15 text-[#1DB954] border border-[#1DB954]/30">
-                <img src="/providers/spotify.png" alt="Spotify" className="h-4 w-4 object-contain" />
-                <span>Spotify Cloud Audio</span>
-              </span>
-
-              {trackData.isFullLength ? (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>Full-Length {trackData.streams?.[0]?.bitrate === "320k" ? "320" : "160"} kbps AAC</span>
+        {/* Track and controls */}
+        <div className="lg:col-span-7 p-5 sm:p-8 lg:p-10 flex flex-col gap-7">
+          <div>
+            <h2 className="text-head leading-[1.02] [overflow-wrap:anywhere]">{trackData.title}</h2>
+            <p className="mt-3 text-lead text-ink">{trackData.artist}</p>
+            {meta && <p className="mt-1 text-body text-muted">{meta}</p>}
+            {trackData.match ? (
+              <p className="mt-4 text-small text-ink" title={`Match score ${trackData.match.score}`}>
+                {trackData.match.confidence === "exact" ? "Verified match" : "Matched"}: {trackData.match.title}
+                <span className="text-muted">
+                  {trackData.match.album ? ` · ${trackData.match.album}` : ""}
+                  {trackData.match.duration > 0 ? ` · ${formatSeconds(trackData.match.duration)}` : ""}
                 </span>
-              ) : (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                  <Radio className="h-3.5 w-3.5" />
-                  <span>Official 30s Preview</span>
-                </span>
-              )}
-            </div>
-
-            {/* Spotify Direct Link */}
-            <a
-              href={trackData.spotifyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#272737] transition-colors"
-            >
-              <span>Open on Spotify</span>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+              </p>
+            ) : isPreview ? (
+              <p className="mt-4 text-small text-ink">
+                No exact full-length version was found, so Spotify&apos;s official 30-second preview is playing.
+              </p>
+            ) : null}
           </div>
 
-          {/* Main Track Showcase: Vinyl Record + Track Info + Dynamic Visualizer */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-            
-            {/* LEFT: Rotating Vinyl Record & High-Res Album Cover */}
-            <div className="md:col-span-5 flex justify-center items-center">
-              <div className="relative group cursor-pointer" onClick={togglePlay}>
-                
-                {/* Vinyl Record that slides & spins behind album sleeve */}
-                <div
-                  className={`absolute top-0 right-0 h-44 w-44 sm:h-56 sm:w-56 rounded-full bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950 border-4 border-zinc-800 shadow-2xl flex items-center justify-center transition-transform duration-700 ease-out ${
-                    isPlaying 
-                      ? "translate-x-12 sm:translate-x-16 rotate-12" 
-                      : "translate-x-4 group-hover:translate-x-8"
-                  }`}
-                  style={{
-                    boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
-                  }}
-                >
-                  {/* Vinyl Grooves concentric rings */}
-                  <div className="absolute inset-2 rounded-full border border-zinc-700/40 pointer-events-none" />
-                  <div className="absolute inset-5 rounded-full border border-zinc-700/30 pointer-events-none" />
-                  <div className="absolute inset-8 rounded-full border border-zinc-700/25 pointer-events-none" />
-                  <div className="absolute inset-11 rounded-full border border-zinc-700/20 pointer-events-none" />
-
-                  {/* Vinyl Center Label (Cover thumbnail) */}
-                  <div 
-                    className={`h-16 w-16 sm:h-20 sm:w-20 rounded-full overflow-hidden border-2 border-zinc-700 shadow-inner flex items-center justify-center ${
-                      isPlaying ? "animate-spin" : ""
-                    }`}
-                    style={{ animationDuration: "3s" }}
-                  >
-                    <img 
-                      src={trackData.cover || "/providers/spotify.png"} 
-                      alt="Cover" 
-                      className="h-full w-full object-cover"
-                    />
-                    <div className="absolute h-3.5 w-3.5 rounded-full bg-zinc-950 border border-zinc-500" />
-                  </div>
-                </div>
-
-                {/* Album Cover Art Sleeve (Foreground) */}
-                <div className="relative z-10 h-44 w-44 sm:h-56 sm:w-56 rounded-2xl overflow-hidden shadow-2xl border-2 border-zinc-200 dark:border-[#333342] bg-zinc-100 dark:bg-zinc-900 group-hover:scale-102 transition-transform">
-                  <img
-                    src={trackData.cover || "/providers/spotify.png"}
-                    alt={trackData.title}
-                    className="h-full w-full object-cover"
-                  />
-
-                  {/* Center Play/Pause Overlay Icon */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <div className="h-14 w-14 rounded-full bg-[#1DB954] text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
-                      {isPlaying ? (
-                        <Pause className="h-7 w-7 fill-white stroke-white" />
-                      ) : (
-                        <Play className="h-7 w-7 fill-white stroke-white ml-0.5" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT: Metadata, Animated Wave Visualizer, and Quick Badges */}
-            <div className="md:col-span-7 space-y-4">
-              
-              {/* Song Title */}
-              <div className="space-y-1.5">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-zinc-950 dark:text-white tracking-tight leading-snug">
-                  {trackData.title}
-                </h2>
-                
-                {/* Artist Name & Album */}
-                <div className="flex flex-wrap items-center gap-2 text-sm sm:text-base font-bold text-zinc-600 dark:text-zinc-300">
-                  <span className="text-blue-600 dark:text-blue-400">{trackData.artist}</span>
-                  {trackData.album && (
-                    <>
-                      <span className="text-zinc-400">•</span>
-                      <span className="text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1.5">
-                        <Disc className="h-4 w-4" />
-                        <span>{trackData.album}</span>
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Which full-length recording is actually playing */}
-                {trackData.match ? (
-                  <p
-                    className="flex flex-wrap items-center gap-1.5 pt-1 text-xs font-medium text-zinc-500 dark:text-zinc-400"
-                    title={`Match score ${trackData.match.score}`}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                    <span>
-                      {trackData.match.confidence === "exact" ? "Verified match" : "Matched"}:{" "}
-                      <span className="font-bold text-zinc-700 dark:text-zinc-200">{trackData.match.title}</span>
-                      {trackData.match.album && <> · {trackData.match.album}</>}
-                      {trackData.match.duration > 0 && <> · {formatSeconds(trackData.match.duration)}</>}
-                    </span>
-                  </p>
-                ) : !trackData.isFullLength ? (
-                  <p className="flex items-center gap-1.5 pt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-                    <Radio className="h-3.5 w-3.5 shrink-0" />
-                    <span>No exact full-length version was found, so the official 30s preview is playing.</span>
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Animated Frequency Visualizer Bars */}
-              <div className="py-3 px-4 rounded-2xl bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#242430]">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isPlaying ? "bg-[#1DB954]" : "bg-zinc-400"} opacity-75`} />
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${isPlaying ? "bg-[#1DB954]" : "bg-zinc-400"}`} />
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      {isPlaying ? "Live Audio Waveform" : "Player Paused"}
-                    </span>
-                  </div>
-
-                  <span className="text-xs font-black text-[#1DB954]">
-                    {activeStream.bitrate === "preview" ? "30s Preview" : `${activeStream.bitrate.toUpperCase()} ${activeStream.codec}`}
-                  </span>
-                </div>
-
-                {/* Bars Spectrum */}
-                <div className="flex items-end justify-between gap-1 h-12 pt-2">
-                  {[
-                    40, 65, 80, 50, 90, 70, 45, 85, 100, 60, 35, 75, 95, 80,
-                    55, 70, 90, 100, 85, 60, 75, 50, 95, 65, 40, 80, 55, 70
-                  ].map((height, i) => {
-                    const dynamicScale = isPlaying 
-                      ? Math.max(0.15, (Math.sin((i * 0.4) + (currentTime * 5)) + 1) / 2) 
-                      : 0.12;
-
-                    return (
-                      <div
-                        key={i}
-                        className="flex-1 rounded-full transition-all duration-150 ease-out"
-                        style={{
-                          height: `${Math.max(4, height * dynamicScale)}px`,
-                          backgroundColor: isPlaying
-                            ? i % 3 === 0 ? "#1DB954" : i % 3 === 1 ? "#3b82f6" : "#10b981"
-                            : "#52525b",
-                          opacity: isPlaying ? 0.9 : 0.4,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Bitrate Selector Pills */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider mr-1">Quality:</span>
-                {trackData.streams?.map((s) => (
-                  <button
-                    key={s.bitrate}
-                    type="button"
-                    onClick={() => handleSwitchQuality(s)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeStream.bitrate === s.bitrate
-                        ? "bg-[#1DB954] text-white shadow-md shadow-[#1DB954]/25"
-                        : "bg-zinc-100 dark:bg-[#121217] text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-[#272737]"
-                    }`}
-                  >
-                    <span>{s.quality}</span>
-                  </button>
-                ))}
-              </div>
-
-            </div>
-          </div>
-
-          {/* Interactive Scrubbar */}
-          <div className="space-y-2 pt-2">
-            <div className="relative flex items-center group">
+          {/* Seek: the segment motif, with a real range input on top for touch and keyboard */}
+          <div>
+            <div className="relative h-5">
+              <Segments count={48} played={duration > 0 ? currentTime / duration : 0} className="absolute inset-0 gap-[3px]" />
               <input
                 type="range"
                 min={0}
                 max={duration || 100}
+                step={0.1}
                 value={currentTime}
                 onChange={handleSeek}
-                className="w-full h-2.5 rounded-lg appearance-none cursor-pointer bg-zinc-200 dark:bg-zinc-800 accent-[#1DB954]"
-                style={{
-                  background: `linear-gradient(to right, #1DB954 ${progressPercent}%, rgba(120,120,120,0.2) ${progressPercent}%)`,
-                }}
+                aria-label="Seek"
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
               />
             </div>
-
-            <div className="flex items-center justify-between text-xs font-bold text-zinc-500 dark:text-zinc-400 px-1">
+            <div className="mt-2 flex justify-between text-small text-muted tabular">
               <span>{formatSeconds(currentTime)}</span>
               <span>{formatSeconds(duration)}</span>
             </div>
           </div>
 
-          {/* Player Transport Controls Bar */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#242430] flex flex-wrap items-center justify-between gap-4">
-            
-            {/* Left Controls: Repeat & Playback Speed */}
+          {/* Transport */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsLooping(!isLooping)}
-                className={`p-2.5 rounded-xl transition-colors cursor-pointer ${
-                  isLooping 
-                    ? "bg-[#1DB954]/20 text-[#1DB954]" 
-                    : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                }`}
-                title={isLooping ? "Loop On" : "Loop Off"}
+                aria-pressed={isLooping}
+                className={`btn min-h-[44px] w-11 px-0 ${isLooping ? "btn-ink" : "btn-quiet"}`}
+                title={isLooping ? "Repeat is on" : "Repeat is off"}
               >
                 <Repeat className="h-4 w-4" strokeWidth={2.4} />
               </button>
-
-              <button
-                type="button"
-                onClick={cyclePlaybackRate}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-black text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                title="Change playback speed"
-              >
+              <button type="button" onClick={cyclePlaybackRate} className="btn btn-quiet min-h-[44px] px-3 text-small tabular" title="Playback speed">
                 {playbackRate}x
               </button>
             </div>
 
-            {/* Center Controls: Skip -10s, Play/Pause, Skip +10s */}
-            <div className="flex items-center gap-3 sm:gap-4">
-              <button
-                type="button"
-                onClick={() => handleSkip(-10)}
-                className="p-3 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer"
-                title="Rewind 10 seconds"
-              >
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => handleSkip(-10)} className="btn btn-quiet min-h-[52px] w-[52px] px-0" aria-label="Back 10 seconds">
                 <RotateCcw className="h-5 w-5" strokeWidth={2.4} />
               </button>
-
               <button
                 type="button"
                 onClick={togglePlay}
-                className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-[#1DB954] hover:bg-[#1aa34a] text-white flex items-center justify-center shadow-xl shadow-[#1DB954]/30 active:scale-95 transition-all cursor-pointer"
-                title={isPlaying ? "Pause" : "Play"}
+                className="btn btn-accent min-h-[64px] w-[64px] px-0"
+                aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isBuffering ? (
-                  <Loader2 className="h-7 w-7 animate-spin" />
+                  <span className="h-6 w-6 rounded-full border-2 border-current border-r-transparent animate-[spin_0.8s_linear_infinite]" />
                 ) : isPlaying ? (
-                  <Pause className="h-7 w-7 fill-white stroke-white" />
+                  <Pause className="h-7 w-7 fill-current" strokeWidth={2.2} />
                 ) : (
-                  <Play className="h-7 w-7 fill-white stroke-white ml-1" />
+                  <Play className="h-7 w-7 fill-current ml-1" strokeWidth={2.2} />
                 )}
               </button>
-
-              <button
-                type="button"
-                onClick={() => handleSkip(10)}
-                className="p-3 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer"
-                title="Fast forward 10 seconds"
-              >
+              <button type="button" onClick={() => handleSkip(10)} className="btn btn-quiet min-h-[52px] w-[52px] px-0" aria-label="Forward 10 seconds">
                 <RotateCw className="h-5 w-5" strokeWidth={2.4} />
               </button>
             </div>
 
-            {/* Right Controls: Volume Slider & Mute Toggle */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={toggleMute}
-                className="p-2.5 rounded-xl text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="h-5 w-5" strokeWidth={2.4} />
-                ) : (
-                  <Volume2 className="h-5 w-5" strokeWidth={2.4} />
-                )}
+              <button type="button" onClick={toggleMute} className="btn btn-quiet min-h-[44px] w-11 px-0" aria-label={isMuted ? "Unmute" : "Mute"}>
+                {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" strokeWidth={2.4} /> : <Volume2 className="h-5 w-5" strokeWidth={2.4} />}
               </button>
-
               <input
                 type="range"
                 min={0}
@@ -632,122 +394,61 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 step={0.05}
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-20 sm:w-24 h-1.5 rounded-lg appearance-none cursor-pointer bg-zinc-300 dark:bg-zinc-700 accent-[#1DB954]"
+                aria-label="Volume"
+                className="w-24 cursor-pointer accent-[var(--accent)] hidden sm:block"
               />
             </div>
           </div>
 
-          {/* Action Row: Direct Downloads & Quick Share */}
-          <div className="pt-2 border-t border-zinc-200 dark:border-[#262633] space-y-4">
-            
-            {/* Download Action Buttons Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              {/* Button 1: best available quality (320k, 160k or preview) */}
-              {trackData.streams?.[0] && (
+          {/* Quality */}
+          {trackData.streams?.length > 1 && (
+            <div role="radiogroup" aria-label="Quality" className="flex flex-wrap gap-2">
+              {trackData.streams.map((s) => (
                 <button
+                  key={s.bitrate}
                   type="button"
-                  onClick={() => handleTriggerDownload(trackData.streams[0])}
-                  disabled={downloadingQuality === trackData.streams[0].bitrate}
-                  className="w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base text-white bg-[#059669] hover:bg-[#047857] shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all cursor-pointer"
+                  role="radio"
+                  aria-checked={activeStream.bitrate === s.bitrate}
+                  onClick={() => handleSwitchQuality(s)}
+                  className={`btn min-h-[44px] text-small ${activeStream.bitrate === s.bitrate ? "btn-ink" : "btn-quiet"}`}
                 >
-                  {downloadingQuality === trackData.streams[0].bitrate ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Starting {trackData.streams[0].quality} download...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-5 w-5" strokeWidth={2.4} />
-                      <span>Download {trackData.streams[0].quality}</span>
-                    </>
-                  )}
+                  {s.quality}
                 </button>
-              )}
-
-              {/* Button 2: second quality if available, otherwise copy stream link */}
-              {trackData.streams?.[1] ? (
-                <button
-                  type="button"
-                  onClick={() => handleTriggerDownload(trackData.streams[1])}
-                  disabled={downloadingQuality === trackData.streams[1].bitrate}
-                  className="w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base text-white bg-[#2563eb] hover:bg-[#1d4ed8] shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  {downloadingQuality === trackData.streams[1].bitrate ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Starting {trackData.streams[1].quality} download...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-5 w-5" strokeWidth={2.4} />
-                      <span>Download {trackData.streams[1].quality}</span>
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCopyStream}
-                  className="w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base text-zinc-800 dark:text-zinc-100 bg-zinc-100 dark:bg-[#121217] hover:bg-zinc-200 dark:hover:bg-[#1c1c24] border border-zinc-200 dark:border-[#272737] flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  {copiedStream ? (
-                    <>
-                      <Check className="h-5 w-5 text-emerald-500" strokeWidth={2.5} />
-                      <span className="text-emerald-500">Audio Stream URL Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-5 w-5" strokeWidth={2.4} />
-                      <span>Copy Direct Audio Stream</span>
-                    </>
-                  )}
-                </button>
-              )}
+              ))}
             </div>
+          )}
 
-            {/* Quick Share Links */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleCopyStream}
-                  className="inline-flex items-center gap-1.5 hover:text-zinc-950 dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  {copiedStream ? (
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                  <span>{copiedStream ? "Stream Copied!" : "Copy Stream Link"}</span>
-                </button>
-
-                <span>•</span>
-
-                <button
-                  type="button"
-                  onClick={handleCopySpotifyLink}
-                  className="inline-flex items-center gap-1.5 hover:text-zinc-950 dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  {copiedLink ? (
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  ) : (
-                    <Share2 className="h-3.5 w-3.5" />
-                  )}
-                  <span>{copiedLink ? "Link Copied!" : "Share Track Link"}</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                <span>Zero Ads • No Login • Unlimited Bitrate</span>
-              </div>
-            </div>
-
+          {/* Downloads */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {trackData.streams?.map((s, i) => (
+              <button
+                key={s.bitrate}
+                type="button"
+                onClick={() => handleTriggerDownload(s)}
+                disabled={downloadingQuality === s.bitrate}
+                className={`btn min-h-[56px] ${i === 0 ? "btn-accent" : "btn-ink"}`}
+              >
+                <Download className="h-5 w-5" strokeWidth={2.4} />
+                {downloadingQuality === s.bitrate ? "Starting download" : s.bitrate === "preview" ? "Download the preview" : `Download ${s.bitrate.replace("k", " kbps")}`}
+              </button>
+            ))}
           </div>
 
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-small">
+            <button type="button" onClick={handleCopyStream} className="link inline-flex items-center gap-1.5 cursor-pointer">
+              {copiedStream ? <Check className="h-4 w-4" strokeWidth={2.4} /> : <Copy className="h-4 w-4" strokeWidth={2.4} />}
+              {copiedStream ? "Stream link copied" : "Copy stream link"}
+            </button>
+            <button type="button" onClick={handleCopySpotifyLink} className="link inline-flex items-center gap-1.5 cursor-pointer">
+              {copiedLink ? <Check className="h-4 w-4" strokeWidth={2.4} /> : <Share2 className="h-4 w-4" strokeWidth={2.4} />}
+              {copiedLink ? "Track link copied" : "Share track link"}
+            </button>
+            <a href={trackData.spotifyUrl} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1.5">
+              Open on Spotify <ExternalLink className="h-4 w-4" strokeWidth={2.4} />
+            </a>
+          </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 };

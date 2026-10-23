@@ -11,43 +11,34 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: "dark",
+  theme: "light",
   toggleTheme: () => {},
   setTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
+  // The boot script in layout.tsx already applied the class before paint; mirror it here.
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
-    const savedTheme = (localStorage.getItem("onlineplayer_theme") || localStorage.getItem("omni_theme")) as Theme | null;
-    if (savedTheme === "light" || savedTheme === "dark") {
-      setThemeState(savedTheme);
-      document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    } else {
-      // Default dark theme
-      setThemeState("dark");
-      document.documentElement.classList.add("dark");
-    }
-    setMounted(true);
+    const isDark = document.documentElement.classList.contains("dark");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from the DOM set before hydration
+    setThemeState(isDark ? "dark" : "light");
   }, []);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem("onlineplayer_theme", newTheme);
+    try {
+      localStorage.setItem("onlineplayer_theme", newTheme);
+    } catch {
+      // storage unavailable (private mode): theme still applies for this visit
+    }
     document.documentElement.classList.toggle("dark", newTheme === "dark");
   };
 
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

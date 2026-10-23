@@ -23,6 +23,10 @@ jobs:
         working-directory: backend/spotify/worker
         run: node --test "test/*.test.js"
 
+      - name: Instagram decoder tests
+        working-directory: backend/instagram/worker
+        run: node --test "test/*.test.js"
+
       - name: Monitor state tests
         working-directory: backend/monitor/worker
         run: node --test "test/*.test.js"
@@ -62,6 +66,7 @@ jobs:
             exit 1
           fi
       - run: npx tsc --noEmit
+      - run: npx eslint src
       - run: npm run build
       - uses: actions/upload-artifact@v5
         with:

@@ -1,72 +1,64 @@
 "use client";
 
-import React from "react";
-import { X, Keyboard } from "lucide-react";
+import React, { useEffect, useRef } from "react";
+import { X } from "lucide-react";
 
 interface ShortcutsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const DIALOG_SHADOW = "shadow-[0_24px_80px_rgba(0,0,0,0.35)]"; // taste-skill-ignore: a real dialog floats above the page
+
 const SHORTCUTS = [
-  { key: "Space", desc: "Play / Pause playback" },
-  { key: "← / →", desc: "Seek backward / forward 5 seconds" },
-  { key: "↑ / ↓", desc: "Volume up / down 10%" },
-  { key: "F", desc: "Toggle Fullscreen" },
-  { key: "M", desc: "Toggle Mute" },
-  { key: "T", desc: "Toggle Theater Widescreen Mode" },
+  { key: "Space", desc: "Play or pause" },
+  { key: "← →", desc: "Back or forward 5 seconds" },
+  { key: "↑ ↓", desc: "Volume up or down" },
+  { key: "F", desc: "Fullscreen" },
+  { key: "M", desc: "Mute" },
+  { key: "T", desc: "Theatre mode" },
 ];
 
-export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  if (!isOpen) return null;
+/** A real dialog: Escape and the backdrop close it, focus moves in and back. */
+export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (isOpen && !dialog.open) dialog.showModal();
+    if (!isOpen && dialog.open) dialog.close();
+  }, [isOpen]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div 
-        className="w-full max-w-md rounded-3xl bg-white dark:bg-[#18181f] border border-zinc-200 dark:border-[#272733] p-6 sm:p-7 shadow-2xl relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-[#272733]">
-          <div className="flex items-center gap-2.5">
-            <Keyboard className="h-5 w-5 text-blue-500" strokeWidth={2.4} />
-            <h2 className="text-base font-bold text-zinc-950 dark:text-white">
-              Keyboard Shortcuts
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#20202a] transition-colors"
-          >
-            <X className="h-4 w-4" strokeWidth={2.5} />
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => e.target === ref.current && onClose()}
+      aria-labelledby="shortcuts-title"
+      className={`m-auto w-[min(440px,calc(100vw-32px))] rounded-ui bg-paper text-ink p-0 backdrop:bg-black/50 ${DIALOG_SHADOW}`}
+    >
+      <div className="p-6">
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="shortcuts-title" className="text-lead font-semibold tracking-[-0.02em]">
+            Keyboard shortcuts
+          </h2>
+          <button onClick={onClose} className="btn btn-quiet min-h-[40px] w-10 px-0" aria-label="Close">
+            <X className="h-5 w-5" strokeWidth={2.4} />
           </button>
         </div>
-
-        {/* Shortcuts list */}
-        <div className="mt-4 space-y-2.5">
+        <dl className="mt-5 flex flex-col gap-1">
           {SHORTCUTS.map((s) => (
-            <div
-              key={s.key}
-              className="flex items-center justify-between text-xs py-2 px-3 rounded-xl bg-zinc-50 dark:bg-[#121217] border border-zinc-200 dark:border-[#262633]"
-            >
-              <span className="text-zinc-700 dark:text-zinc-300 font-medium">
-                {s.desc}
-              </span>
-              <kbd className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#20202a] border border-zinc-300 dark:border-[#303040] font-mono text-[11px] font-bold text-zinc-800 dark:text-zinc-200 shadow-xs">
-                {s.key}
-              </kbd>
+            <div key={s.key} className="flex items-center justify-between gap-4 rounded-ui bg-surface-2 px-4 min-h-[48px]">
+              <dt className="text-body">{s.desc}</dt>
+              <dd>
+                <kbd className="inline-block min-w-[44px] rounded-[4px] bg-paper px-2 py-1 text-center text-small font-medium">{s.key}</kbd>
+              </dd>
             </div>
           ))}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-5 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          Press any shortcut while the video player is in focus.
-        </div>
+        </dl>
+        <p className="mt-4 text-small text-muted">They work while a video is playing on this page.</p>
       </div>
-    </div>
+    </dialog>
   );
 };

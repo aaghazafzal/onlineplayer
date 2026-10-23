@@ -54,6 +54,7 @@ interface InstagramApiMedia {
   stream_url: string;
   download_url?: string;
   direct_url?: string;
+  proxy_url?: string;
   thumbnail?: string;
   filename?: string;
 }
@@ -92,6 +93,7 @@ async function resolveInstagram(url: string): Promise<ResolveResult> {
         stream_url: m.stream_url,
         download_url: m.download_url,
         direct_url: m.direct_url,
+        proxy_url: m.proxy_url,
         thumbnail: m.thumbnail || "",
         filename: m.filename || `instagram-${data.shortcode || "media"}-${idx + 1}.${m.type === "photo" ? "jpg" : "mp4"}`,
       })
