@@ -1,0 +1,16 @@
+{
+  "name": "onlineplayer-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Health monitor for OnlinePlayer: end-to-end provider checks, Telegram alerts and status page",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "test": "node --test \"test/*.test.js\"",
+    "deploy": "npm test && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  }
+}

@@ -1,0 +1,22 @@
+name = "onlineplayer-monitor"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+workers_dev = true
+
+# Run every 15 minutes (the first run of each hour is a "deep" run that bypasses provider caches)
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[kv_namespaces]]
+binding = "MONITOR_STATE"
+id = "15460b1562e8430498b5305a893ef0b5"
+
+# Optional secrets (wrangler secret put <NAME>):
+#   TELEGRAM_BOT_TOKEN - bot token from @BotFather
+#   TELEGRAM_CHAT_ID   - your chat id (send /start to the bot, then see README)
+#   MONITOR_KEY        - enables POST /api/run for manual runs / test alerts
+
+# Public status page
+[[routes]]
+pattern = "status.onlineplayer.site"
+custom_domain = true
