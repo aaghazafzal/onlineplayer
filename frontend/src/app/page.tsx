@@ -14,6 +14,7 @@ import { AudioPlayer, SpotifyTrackData } from "../components/AudioPlayer";
 import { SpotifyPlaylistViewer, SpotifyPlaylistData } from "../components/SpotifyPlaylistViewer";
 import { RecentStreams, HistoryItem } from "../components/RecentStreams";
 import { ShortcutsModal } from "../components/ShortcutsModal";
+import { YouTubeViewer, YouTubeData } from "../components/YouTubeViewer";
 import { resolveLink } from "../lib/resolvers";
 
 export default function Home() {
@@ -23,6 +24,7 @@ export default function Home() {
   const [instagramData, setInstagramData] = useState<InstagramPostData | null>(null);
   const [spotifyData, setSpotifyData] = useState<SpotifyTrackData | null>(null);
   const [spotifyPlaylistData, setSpotifyPlaylistData] = useState<SpotifyPlaylistData | null>(null);
+  const [youtubeData, setYoutubeData] = useState<YouTubeData | null>(null);
   const [filesList, setFilesList] = useState<FileItem[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [isCachedHit, setIsCachedHit] = useState(false);
@@ -75,6 +77,7 @@ export default function Home() {
       setInstagramData(null);
       setSpotifyData(null);
       setSpotifyPlaylistData(null);
+      setYoutubeData(null);
       setFilesList([]);
       setCurrentFileIndex(0);
       setIsCachedHit(false);
@@ -93,6 +96,10 @@ export default function Home() {
           break;
         case "spotify_playlist":
           setSpotifyPlaylistData(result.playlist);
+          saveToHistory(result.history);
+          break;
+        case "youtube":
+          setYoutubeData(result.video);
           saveToHistory(result.history);
           break;
         case "terabox":
@@ -153,7 +160,7 @@ export default function Home() {
     handleResolve(item.originalUrl, false);
   };
 
-  const hasPlayer = Boolean(streamData || instagramData || spotifyData || spotifyPlaylistData);
+  const hasPlayer = Boolean(streamData || instagramData || spotifyData || spotifyPlaylistData || youtubeData);
 
   return (
     <div id="top" className="min-h-svh flex flex-col bg-bg text-ink">
@@ -178,7 +185,7 @@ export default function Home() {
                   <span className="rise-line"><span style={{ "--i": 1 } as React.CSSProperties}>Play it whole.</span></span>
                 </h1>
                 <p className="mt-8 max-w-[38ch] text-body text-ink">
-                  TeraBox videos, Instagram posts and Spotify songs, played or saved in your browser. Free, with no login.
+                  TeraBox videos, Instagram posts, Spotify and JioSaavn songs, and YouTube, played or saved in your browser. Free, with no login.
                 </p>
 
                 <div className="mt-10 max-w-[560px]">
@@ -213,8 +220,10 @@ export default function Home() {
 
         {hasPlayer && (
           <section id="player-container" aria-label="Player" className="frame pt-12 lg:pt-16 scroll-mt-24 space-y-6">
-            {spotifyPlaylistData ? (
-              <SpotifyPlaylistViewer playlistData={spotifyPlaylistData} autoStartDownload={autoStartDownload} />
+            {youtubeData ? (
+              <YouTubeViewer key={`${youtubeData.type}:${youtubeData.id}`} data={youtubeData} autoStartDownload={autoStartDownload} />
+            ) : spotifyPlaylistData ? (
+              <SpotifyPlaylistViewer key={`${spotifyPlaylistData.provider}:${spotifyPlaylistData.id}`} playlistData={spotifyPlaylistData} autoStartDownload={autoStartDownload} />
             ) : spotifyData ? (
               <AudioPlayer key={spotifyData.trackId} trackData={spotifyData} autoStartDownload={autoStartDownload} />
             ) : instagramData ? (

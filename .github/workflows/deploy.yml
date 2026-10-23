@@ -13,7 +13,7 @@ on:
         description: "What to deploy"
         type: choice
         default: all
-        options: [all, frontend, terabox, instagram, spotify, monitor]
+        options: [all, frontend, terabox, instagram, spotify, jiosaavn, youtube, monitor]
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -34,6 +34,8 @@ jobs:
       terabox: ${{ steps.pick.outputs.terabox }}
       instagram: ${{ steps.pick.outputs.instagram }}
       spotify: ${{ steps.pick.outputs.spotify }}
+      jiosaavn: ${{ steps.pick.outputs.jiosaavn }}
+      youtube: ${{ steps.pick.outputs.youtube }}
       monitor: ${{ steps.pick.outputs.monitor }}
     steps:
       - id: token
@@ -52,7 +54,7 @@ jobs:
           TARGET: ${{ inputs.target }}
           BEFORE: ${{ github.event.before }}
         run: |
-          parts="frontend terabox instagram spotify monitor"
+          parts="frontend terabox instagram spotify jiosaavn youtube monitor"
           if [ -n "$TARGET" ]; then
             for p in $parts; do
               if [ "$TARGET" = all ] || [ "$TARGET" = "$p" ]; then echo "$p=true"; else echo "$p=false"; fi
@@ -68,6 +70,8 @@ jobs:
             echo "terabox=$(has '^backend/terabox/worker/')"
             echo "instagram=$(has '^backend/instagram/worker/')"
             echo "spotify=$(has '^backend/spotify/worker/')"
+            echo "jiosaavn=$(has '^backend/jiosaavn/worker/')"
+            echo "youtube=$(has '^backend/youtube/worker/')"
             echo "monitor=$(has '^backend/monitor/worker/')"
           } >> "$GITHUB_OUTPUT"
 
@@ -78,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        worker: [terabox, instagram, spotify, monitor]
+        worker: [terabox, instagram, spotify, jiosaavn, youtube, monitor]
     steps:
       - name: Skip unchanged worker
         id: gate

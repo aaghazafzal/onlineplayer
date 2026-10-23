@@ -1,0 +1,19 @@
+{
+  "name": "jiosaavn-player-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JioSaavn link resolver: songs, albums, playlists and artists to full-length AAC streams on Cloudflare Workers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test \"test/*.test.js\"",
+    "deploy": "npm test && wrangler deploy"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  }
+}

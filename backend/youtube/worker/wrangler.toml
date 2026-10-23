@@ -1,0 +1,20 @@
+name = "youtube-player-api"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+workers_dev = true
+
+# Per-IP limits (Workers Rate Limiting API, no KV writes)
+[[ratelimits]]
+name = "RESOLVE_LIMITER"
+namespace_id = "5001"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "DOWNLOAD_LIMITER"
+namespace_id = "5002"
+simple = { limit = 6, period = 60 }
+
+# Custom Domain for the YouTube worker
+[[routes]]
+pattern = "youtube.onlineplayer.site"
+custom_domain = true

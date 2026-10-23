@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUp } from "lucide-react";
-import { DirectFragment, InstagramFragment, SpotifyFragment, TeraBoxFragment } from "./ProductFragments";
+import { DirectFragment, InstagramFragment, JioSaavnFragment, SpotifyFragment, TeraBoxFragment, YouTubeFragment } from "./ProductFragments";
 
 /* ==========================================================================
    Hero stage: the accent field at full height with the three players
    crossfading slowly (signature move). Reduced motion shows the first only.
    ========================================================================== */
-const STAGE_FRAGMENTS = [TeraBoxFragment, InstagramFragment, SpotifyFragment];
+const STAGE_FRAGMENTS = [TeraBoxFragment, InstagramFragment, SpotifyFragment, JioSaavnFragment, YouTubeFragment];
 
 export function HeroStage() {
   const [active, setActive] = useState(0);
@@ -71,6 +71,20 @@ const SERVICES = [
     block: "bg-field-5",
     Fragment: SpotifyFragment,
     fact: "Each song is matched to the same recording and plays in full at 320 kbps. Playlists and albums play track by track.",
+  },
+  {
+    id: "jiosaavn",
+    name: "JioSaavn",
+    block: "bg-field-2",
+    Fragment: JioSaavnFragment,
+    fact: "Songs, albums, playlists and an artist's top songs, all at up to 320 kbps. Playing and saving come straight from JioSaavn's servers.",
+  },
+  {
+    id: "youtube",
+    name: "YouTube",
+    block: "bg-field-4",
+    Fragment: YouTubeFragment,
+    fact: "Videos, Shorts and playlists play in YouTube's own player, with no limit. Downloads are attempted too, but YouTube sometimes blocks them.",
   },
   {
     id: "direct",
@@ -219,6 +233,25 @@ const FORMATS: { name: string; rows: [string, string][] }[] = [
     ],
   },
   {
+    name: "JioSaavn",
+    rows: [
+      ["jiosaavn.com/song/…", "Full song, 320 kbps"],
+      ["jiosaavn.com/album/…", "Every song"],
+      ["jiosaavn.com/featured/…", "Playlist, up to 200 songs"],
+      ["jiosaavn.com/artist/…", "Top songs"],
+    ],
+  },
+  {
+    name: "YouTube",
+    rows: [
+      ["youtube.com/watch?v=…", "Video"],
+      ["youtu.be/…", "Video"],
+      ["youtube.com/shorts/…", "Short"],
+      ["youtube.com/playlist?list=…", "Whole playlist"],
+      ["music.youtube.com/watch?v=…", "Song video"],
+    ],
+  },
+  {
     name: "Direct video files",
     rows: [
       ["…/video.mp4", "Plays as it is"],
@@ -228,10 +261,12 @@ const FORMATS: { name: string; rows: [string, string][] }[] = [
 ];
 
 export function LinkFormats() {
+  // Rows render only while their group is open, so closed groups hold no hidden text
+  const [open, setOpen] = useState<Record<string, boolean>>({ [FORMATS[0].name]: true });
   return (
     <section id="links" aria-labelledby="links-title" className="bg-bg py-[var(--section-gap)]">
       <div className="frame">
-        <div className="mx-auto max-w-[640px] [container-type:inline-size]">
+        <div className="mx-auto lg:max-w-[640px] [container-type:inline-size]">
           <h2
             id="links-title"
             className="font-semibold leading-[0.8] tracking-[-0.05em] text-ink text-[36cqw] -ml-[0.04em]"
@@ -244,6 +279,10 @@ export function LinkFormats() {
               <details
                 key={f.name}
                 open={i === 0}
+                onToggle={(e) => {
+                  const isOpen = e.currentTarget.open;
+                  setOpen((prev) => ({ ...prev, [f.name]: isOpen }));
+                }}
                 className="group rounded-ui bg-surface"
                 data-reveal
                 style={{ "--i": i } as React.CSSProperties}
@@ -252,14 +291,16 @@ export function LinkFormats() {
                   {f.name}
                   <span className="plus" aria-hidden="true" />
                 </summary>
-                <ul className="px-5 pb-5 pt-1 flex flex-col gap-[14px]">
-                  {f.rows.map(([pattern, gives]) => (
-                    <li key={pattern} className="flex items-baseline justify-between gap-6 text-body">
-                      <span className="min-w-0 break-words">{pattern}</span>
-                      <span className="shrink-0 text-right text-muted">{gives}</span>
-                    </li>
-                  ))}
-                </ul>
+                {open[f.name] && (
+                  <ul className="px-5 pb-5 pt-1 flex flex-col gap-[14px]">
+                    {f.rows.map(([pattern, gives]) => (
+                      <li key={pattern} className="flex items-baseline justify-between gap-6 text-body">
+                        <span className="min-w-0 break-words">{pattern}</span>
+                        <span className="shrink-0 text-right text-muted">{gives}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </details>
             ))}
           </div>
@@ -294,8 +335,12 @@ const QUESTIONS: [string, string][] = [
     "The first time anyone opens a link, the full stream has to be found. After that it is cached, so it starts almost at once for a few hours.",
   ],
   [
+    "Why does a YouTube download sometimes fail?",
+    "YouTube often asks servers like ours to sign in before it hands over a file, and we do not get around that. Playing always works, because it uses YouTube's own player. If a download fails, try again in a few minutes.",
+  ],
+  [
     "How do downloads work?",
-    "TeraBox videos are saved as MP4, assembled in your browser from the stream. Instagram media and Spotify songs (.m4a) download directly.",
+    "TeraBox videos are saved as MP4, assembled in your browser from the stream. Instagram media, Spotify and JioSaavn songs (.m4a) download directly, and YouTube offers MP4 or M4A when it allows it.",
   ],
   [
     "Does it work on my phone?",
@@ -382,6 +427,8 @@ export function SiteFooter() {
             <Link className="link" href="/#services">TeraBox</Link>
             <Link className="link" href="/#services">Instagram</Link>
             <Link className="link" href="/#services">Spotify</Link>
+            <Link className="link" href="/#services">JioSaavn</Link>
+            <Link className="link" href="/#services">YouTube</Link>
           </nav>
           <nav aria-label="Help" className="lg:col-span-2 flex flex-col gap-2">
             <Link className="link" href="/#how">How it works</Link>

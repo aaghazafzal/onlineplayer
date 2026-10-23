@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, VolumeX, Download, ExternalLink, Search, Check, Share2 } from "lucide-react";
 import { Segments } from "./Segments";
+import { audioFileName, saveFromCdn } from "../lib/download";
 import type { SpotifyTrackData } from "./AudioPlayer";
 import { fetchProviderJson } from "../lib/api";
 
@@ -16,12 +17,16 @@ export interface SpotifyPlaylistItem {
   isExplicit: boolean;
   previewUrl: string | null;
   spotifyUrl: string;
+  /** Already playable (JioSaavn): no lookup needed */
+  resolved?: SpotifyTrackData;
 }
 
 export interface SpotifyPlaylistData {
   ok: boolean;
-  provider: "spotify";
-  type: "playlist" | "album";
+  provider: "spotify" | "jiosaavn";
+  /** Shown as "Open on …"; defaults to Spotify */
+  sourceName?: string;
+  type: "playlist" | "album" | "artist";
   id: string;
   title: string;
   subtitle: string;
@@ -76,7 +81,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
 
   // Active track object
   const currentTrack = currentTrackIndex !== null ? tracks[currentTrackIndex] : null;
-  const currentResolved = currentTrack?.id ? resolvedCache[currentTrack.id] : null;
+  const currentResolved = currentTrack?.id ? currentTrack.resolved ?? resolvedCache[currentTrack.id] : null;
 
   // Filtered tracks for the tracklist
   const filteredTracks = useMemo(() => {
@@ -91,6 +96,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
   const resolveTrackAudio = useCallback(
     async (track: SpotifyPlaylistItem): Promise<SpotifyTrackData | null> => {
       if (!track.id) return null;
+      if (track.resolved) return track.resolved;
       if (resolvedCache[track.id]) {
         return resolvedCache[track.id];
       }
@@ -143,7 +149,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
       setCurrentTime(0);
 
       // Check if already resolved
-      let trackAudio: SpotifyTrackData | null = resolvedCache[track.id] ?? null;
+      let trackAudio: SpotifyTrackData | null = track.resolved ?? resolvedCache[track.id] ?? null;
       if (!trackAudio) {
         setIsResolvingCurrent(true);
         trackAudio = await resolveTrackAudio(track);
@@ -320,7 +326,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
 
     setDownloadingId(track.id);
     try {
-      let resolved = resolvedCache[track.id];
+      let resolved = track.resolved ?? resolvedCache[track.id];
       if (!resolved) {
         resolved = (await resolveTrackAudio(track)) as SpotifyTrackData;
       }
@@ -330,16 +336,10 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
         return;
       }
 
-      // Prefer 320 kbps stream download URL, fallback to first stream downloadUrl
+      // Best quality first, saved straight from the CDN; the Worker link is the fallback
       const stream = resolved.streams[0];
-      const dlUrl = stream.downloadUrl || stream.streamUrl;
-
-      const a = document.createElement("a");
-      a.href = dlUrl;
-      a.download = `${track.artist} - ${track.title} (${stream.bitrate === "preview" ? "preview" : stream.bitrate + "bps"}).${stream.codec === "MP3" ? "mp3" : "m4a"}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const fileName = stream.fileName || audioFileName(track.artist, track.title, stream.bitrate, stream.codec);
+      await saveFromCdn(stream.directUrl || stream.streamUrl, fileName, stream.downloadUrl);
 
       setDownloadDoneId(track.id);
       setTimeout(() => setDownloadDoneId(null), 3000);
@@ -384,6 +384,8 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
   };
 
   const isAlbum = playlistData.type === "album";
+  const kindLabel = playlistData.type === "album" ? "Album" : playlistData.type === "artist" ? "Top songs" : "Playlist";
+  const sourceName = playlistData.sourceName || "Spotify";
   const progress = duration > 0 ? currentTime / duration : 0;
 
   const transport = (
@@ -425,7 +427,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
   );
 
   return (
-    <article className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3" aria-label={`${isAlbum ? "Album" : "Playlist"}: ${playlistData.title}`}>
+    <article className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3" aria-label={`${kindLabel}: ${playlistData.title}`}>
       <audio
         ref={audioRef}
         preload="auto"
@@ -449,7 +451,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
               className="w-28 sm:w-40 lg:w-full aspect-square object-cover rounded-ui shrink-0"
             />
             <div className="lg:mt-5 min-w-0 text-stage-ink">
-              <p className="text-small text-stage-muted">{isAlbum ? "Album" : "Playlist"}</p>
+              <p className="text-small text-stage-muted">{kindLabel}</p>
               <h2 className="mt-1 text-lead lg:text-head font-semibold tracking-[-0.03em] leading-[1.05] [overflow-wrap:anywhere]">
                 {playlistData.title}
               </h2>
@@ -519,7 +521,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
               </div>
             </div>
           ) : (
-            <p className="text-small text-muted">Press a track or Play all. Each song is matched to its full-length recording when it starts.</p>
+            <p className="text-small text-muted">{playlistData.provider === "spotify" ? "Press a track or Play all. Each song is matched to its full-length recording when it starts." : "Press a track or Play all. Every song plays in full."}</p>
           )}
 
           {errorNotice && (
@@ -534,7 +536,7 @@ export const SpotifyPlaylistViewer: React.FC<SpotifyPlaylistViewerProps> = ({
               {copiedLink ? "Link copied" : `Share ${isAlbum ? "album" : "playlist"}`}
             </button>
             <a href={playlistData.spotifyUrl} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1.5">
-              Open on Spotify <ExternalLink className="h-4 w-4" strokeWidth={2.4} />
+              Open on {sourceName} <ExternalLink className="h-4 w-4" strokeWidth={2.4} />
             </a>
           </div>
         </div>

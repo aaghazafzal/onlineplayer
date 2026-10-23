@@ -4,18 +4,20 @@ import type { InstagramMediaItem, InstagramPostData } from "../components/Instag
 import type { SpotifyTrackData } from "../components/AudioPlayer";
 import type { SpotifyPlaylistData, SpotifyPlaylistItem } from "../components/SpotifyPlaylistViewer";
 import type { HistoryItem } from "../components/RecentStreams";
+import type { YouTubeData } from "../components/YouTubeViewer";
 import { ApiError, fetchProviderJson } from "./api";
 
 export type { SpotifyPlaylistData, SpotifyPlaylistItem };
 
-export type ProviderKind = "direct" | "instagram" | "spotify" | "terabox" | "diskwala";
+export type ProviderKind = "direct" | "instagram" | "spotify" | "jiosaavn" | "youtube" | "terabox" | "diskwala";
 
 export type ResolveResult =
   | { kind: "direct"; stream: StreamData }
   | { kind: "instagram"; post: InstagramPostData; history: HistoryItem }
   | { kind: "spotify"; track: SpotifyTrackData; history: HistoryItem }
   | { kind: "spotify_playlist"; playlist: SpotifyPlaylistData; history: HistoryItem }
-  | { kind: "terabox"; files: FileItem[]; stream: StreamData; cached: boolean; history: HistoryItem | null };
+  | { kind: "terabox"; files: FileItem[]; stream: StreamData; cached: boolean; history: HistoryItem | null }
+  | { kind: "youtube"; video: YouTubeData; history: HistoryItem };
 
 const TERABOX_HOST_HINTS = [
   "terabox", "1024tera", "dubox", "nephobox", "mirrobox", "momerybox",
@@ -27,6 +29,8 @@ export function detectProvider(rawUrl: string): ProviderKind | null {
   const path = url.split(/[?#]/)[0];
   if (path.endsWith(".m3u8") || path.endsWith(".mp4")) return "direct";
   if (url.includes("instagram.com") || url.includes("instagr.am")) return "instagram";
+  if (/(^|\/\/|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)\//.test(url)) return "youtube";
+  if (/(^|\/\/|\.)(jiosaavn\.com|saavn\.com|jiosaavn\.page\.link)\//.test(url)) return "jiosaavn";
   if (
     url.includes("spotify.com") ||
     url.includes("spotify.link") ||
@@ -228,6 +232,147 @@ async function resolveSpotify(url: string): Promise<ResolveResult> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// JioSaavn: everything arrives playable, so tracks are pre-resolved for the players
+// ---------------------------------------------------------------------------
+interface SaavnTrack {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  year: string;
+  explicit: boolean;
+  duration: number;
+  durationFormatted: string;
+  cover: string;
+  url: string;
+  streams: SpotifyTrackData["streams"];
+}
+
+type SaavnResponse = Partial<SaavnTrack> & {
+  ok?: boolean;
+  error?: string;
+  type?: "song" | "album" | "playlist" | "artist";
+  subtitle?: string;
+  trackCount?: number;
+  totalDuration?: number;
+  totalDurationFormatted?: string;
+  sourceUrl?: string;
+  tracks?: SaavnTrack[];
+};
+
+function saavnToTrack(t: SaavnTrack): SpotifyTrackData {
+  return {
+    ok: true,
+    provider: "jiosaavn",
+    sourceName: "JioSaavn",
+    type: "track",
+    trackId: t.id,
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    year: t.year,
+    duration: t.duration,
+    durationFormatted: t.durationFormatted,
+    cover: t.cover,
+    streamUrl: t.streams[0]?.streamUrl || "",
+    directStreamUrl: t.streams[0]?.directUrl || "",
+    streams: t.streams,
+    previewUrl: null,
+    isFullLength: true,
+    match: null,
+    spotifyUrl: t.url,
+  };
+}
+
+async function resolveJioSaavn(url: string): Promise<ResolveResult> {
+  const { status, data } = await fetchProviderJson<SaavnResponse>("jiosaavn", `/api/resolve?url=${enc(url)}`);
+  if (status >= 400 || !data.ok) throw new ApiError(data.error || "Could not open this JioSaavn link.", status);
+
+  if (data.type === "song") {
+    const track = saavnToTrack(data as SaavnTrack);
+    return {
+      kind: "spotify",
+      track,
+      history: {
+        surl: `saavn:${track.trackId}`,
+        originalUrl: url,
+        title: `${track.artist} - ${track.title}`,
+        durationFormatted: track.durationFormatted,
+        sizeFormatted: "JioSaavn song",
+        thumbnail: track.cover,
+        streamUrl: track.streamUrl,
+        playedAt: Date.now(),
+      },
+    };
+  }
+
+  const tracks = data.tracks || [];
+  const playlist: SpotifyPlaylistData = {
+    ok: true,
+    provider: "jiosaavn",
+    sourceName: "JioSaavn",
+    type: data.type === "album" ? "album" : data.type === "artist" ? "artist" : "playlist",
+    id: data.id || "",
+    title: data.title || "JioSaavn",
+    subtitle: data.subtitle || "",
+    cover: data.cover || "",
+    trackCount: data.trackCount || tracks.length,
+    totalDuration: data.totalDuration || 0,
+    totalDurationFormatted: data.totalDurationFormatted || "",
+    spotifyUrl: data.sourceUrl || url,
+    tracks: tracks.map((t, i) => ({
+      index: i + 1,
+      id: t.id,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      durationFormatted: t.durationFormatted,
+      isExplicit: t.explicit,
+      previewUrl: null,
+      spotifyUrl: t.url,
+      resolved: saavnToTrack(t),
+    })),
+  };
+  return {
+    kind: "spotify_playlist",
+    playlist,
+    history: {
+      surl: `saavn:${data.type}:${playlist.id || url}`,
+      originalUrl: url,
+      title: playlist.title,
+      durationFormatted: `${playlist.trackCount} songs`,
+      sizeFormatted: `JioSaavn ${playlist.type}`,
+      thumbnail: playlist.cover,
+      streamUrl: url,
+      playedAt: Date.now(),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// YouTube: played through YouTube's embedded player
+// ---------------------------------------------------------------------------
+async function resolveYouTube(url: string): Promise<ResolveResult> {
+  const { status, data } = await fetchProviderJson<YouTubeData & { ok?: boolean; error?: string }>("youtube", `/api/resolve?url=${enc(url)}`);
+  if (status >= 400 || !data.ok) throw new ApiError(data.error || "Could not open this YouTube link.", status);
+  const video: YouTubeData = { ...data, provider: "youtube" };
+  return {
+    kind: "youtube",
+    video,
+    history: {
+      surl: `yt:${video.type}:${video.id}`,
+      originalUrl: url,
+      title: video.title,
+      durationFormatted: video.type === "playlist" ? `${video.totalVideos || video.videos?.length || 0} videos` : video.isShort ? "Short" : "YouTube",
+      sizeFormatted: "YouTube",
+      thumbnail: video.type === "playlist" ? video.videos?.[0]?.thumbnail || "" : `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+      streamUrl: url,
+      playedAt: Date.now(),
+    },
+  };
+}
+
 interface TeraboxApiFile {
   fs_id: string;
   filename?: string;
@@ -304,13 +449,17 @@ export async function resolveLink(rawUrl: string): Promise<ResolveResult> {
       return resolveSpotify(url);
     case "terabox":
       return resolveTerabox(url);
+    case "jiosaavn":
+      return resolveJioSaavn(url);
+    case "youtube":
+      return resolveYouTube(url);
     case "diskwala":
       throw new ApiError(
         "DiskWala support is coming in the next update. TeraBox, Instagram and Spotify links work right now."
       );
     default:
       throw new ApiError(
-        "This link is not supported yet. Currently TeraBox, Instagram, Spotify and direct .mp4/.m3u8 links are supported."
+        "This link is not supported yet. TeraBox, Instagram, Spotify, JioSaavn, YouTube and direct .mp4/.m3u8 links work."
       );
   }
 }

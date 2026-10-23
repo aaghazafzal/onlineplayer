@@ -15,6 +15,8 @@ const INSTAGRAM_TEST_LINK = "https://www.instagram.com/p/DerUlPplt8G/";
 // Indian catalogue track: JioSaavn returns it from any region, so the check
 // does not depend on the monitor's own IP country.
 const SPOTIFY_TEST_LINK = "https://open.spotify.com/track/6VBhH7CyP56BXjp8VsDFPZ";
+const JIOSAAVN_TEST_LINK = "https://www.jiosaavn.com/song/kesariya/AgIAQyBeWlI";
+const YOUTUBE_TEST_LINK = "https://www.youtube.com/watch?v=jNQXAC9IVRw";
 
 class CheckError extends Error {}
 
@@ -102,6 +104,34 @@ export const CHECKS = [
       const audio = await get(data.streamUrl, { headers: { Range: "bytes=0-1023" } });
       assert(audio.status === 206, `Audio stream returned HTTP ${audio.status} instead of 206`);
       await audio.body?.cancel();
+    },
+  },
+  {
+    id: "jiosaavn",
+    name: "JioSaavn songs",
+    async run({ deep }) {
+      const { res, data } = await getJson(
+        `https://jiosaavn.onlineplayer.site/api/resolve?url=${encodeURIComponent(JIOSAAVN_TEST_LINK)}${deep ? "&refresh=1" : ""}`,
+        { timeoutMs: 40000 }
+      );
+      assert(res.ok && data.ok, `Resolve failed: ${data.error || `HTTP ${res.status}`}`);
+      const stream = data.streams?.[0]?.streamUrl;
+      assert(stream, "No stream returned");
+      const audio = await get(stream, { headers: { Range: "bytes=0-1023" } });
+      assert(audio.status === 206, `Audio CDN returned HTTP ${audio.status} instead of 206`);
+      await audio.body?.cancel();
+    },
+  },
+  {
+    // Playback uses YouTube's embedded player, so the check covers link resolving only
+    id: "youtube",
+    name: "YouTube links",
+    async run({ deep }) {
+      const { res, data } = await getJson(
+        `https://youtube.onlineplayer.site/api/resolve?url=${encodeURIComponent(YOUTUBE_TEST_LINK)}${deep ? "&refresh=1" : ""}`,
+        { timeoutMs: 30000 }
+      );
+      assert(res.ok && data.ok && data.title, `Resolve failed: ${data.error || `HTTP ${res.status}`}`);
     },
   },
 ];

@@ -136,3 +136,66 @@ export function DirectFragment({ className = "" }: { className?: string }) {
     </figure>
   );
 }
+
+export function JioSaavnFragment({ className = "" }: { className?: string }) {
+  const rows: [string, string][] = [
+    ["Kesariya", "4:28"],
+    ["Deva Deva", "4:39"],
+    ["Rasiya", "3:42"],
+  ];
+  return (
+    <figure className={`bg-paper text-ink rounded-ui p-3 sm:p-4 ${className}`}>
+      <div data-ui className="flex items-end gap-4">
+        <div className="aspect-square w-[34%] shrink-0 rounded-ui bg-field-2 text-[#141414] p-3 flex flex-col justify-end">
+          <span className="text-lead font-semibold leading-none tracking-[-0.03em]">Brahmastra</span>
+          <span className="text-small mt-1">9 songs</span>
+        </div>
+        <div className="min-w-0 pb-1">
+          <p className="text-small text-muted">Album · JioSaavn</p>
+          <p className="text-lead font-semibold leading-tight tracking-[-0.02em] truncate">Brahmastra</p>
+          <p className="text-small text-muted truncate">Pritam, Arijit Singh</p>
+        </div>
+      </div>
+      <figcaption data-ui className="mt-4 flex flex-col gap-1">
+        {rows.map(([t, d], i) => (
+          <div key={t} className={`flex items-center gap-3 rounded-ui px-3 min-h-[44px] ${i === 0 ? "bg-accent text-accent-ink" : "bg-surface-2"}`}>
+            <span className="text-small tabular w-4">{i === 0 ? <Pause className="h-4 w-4" strokeWidth={2.4} /> : i + 1}</span>
+            <span className="flex-1 text-small font-medium truncate">{t}</span>
+            <span className="text-small tabular opacity-80">{d}</span>
+            <Download className="h-4 w-4" strokeWidth={2.4} />
+          </div>
+        ))}
+      </figcaption>
+    </figure>
+  );
+}
+
+export function YouTubeFragment({ className = "" }: { className?: string }) {
+  return (
+    <figure className={`on-stage bg-stage text-stage-ink rounded-ui p-3 sm:p-4 ${className}`}>
+      <div className="relative aspect-video overflow-clip rounded-ui">
+        <img
+          src="/media/photo-954.jpg"
+          alt="A narrow opening in a white wall showing a white staircase"
+          width={1200}
+          height={1500}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+        <span className="absolute inset-0 m-auto inline-flex h-14 w-14 items-center justify-center rounded-ui bg-accent text-accent-ink">
+          <Play className="h-6 w-6 fill-current" strokeWidth={2.4} />
+        </span>
+      </div>
+      <figcaption data-ui className="mt-3 space-y-3">
+        <div className="text-small">
+          <p className="font-medium truncate">Stairs of light, a short film</p>
+          <p className="text-stage-muted">YouTube · plays in YouTube&apos;s own player</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-small">
+          <span className="btn btn-accent min-h-[40px] text-small">MP4</span>
+          <span className="btn min-h-[40px] text-small bg-stage-ink text-stage">M4A</span>
+        </div>
+      </figcaption>
+    </figure>
+  );
+}

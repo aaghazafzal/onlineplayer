@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX, Download, Copy, Check, ExternalLink, Repeat, Share2 } from "lucide-react";
 import { Segments } from "./Segments";
+import { audioFileName, saveFromCdn } from "../lib/download";
 
 export interface SpotifyStreamOption {
   quality: string;
@@ -11,6 +12,8 @@ export interface SpotifyStreamOption {
   streamUrl: string;
   directUrl: string;
   downloadUrl: string;
+  /** Suggested file name when saving straight from the CDN */
+  fileName?: string;
   /** Same audio through the Worker, used if the CDN refuses this browser */
   proxyUrl?: string;
 }
@@ -29,7 +32,9 @@ export interface SpotifyMatchInfo {
 
 export interface SpotifyTrackData {
   ok: boolean;
-  provider: "spotify";
+  provider: "spotify" | "jiosaavn";
+  /** Shown as "Open on …"; defaults to Spotify */
+  sourceName?: string;
   type: "track";
   trackId: string;
   title: string;
@@ -212,21 +217,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   };
 
   // Download Trigger
+  // Saves straight from the CDN (no Worker request); the Worker link is the fallback
   const handleTriggerDownload = (stream: SpotifyStreamOption) => {
     setDownloadingQuality(stream.bitrate);
-    const downloadUrl = stream.downloadUrl || stream.streamUrl;
-    
-    // Create hidden anchor with download attribute
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = `${trackData.artist} - ${trackData.title} (${stream.bitrate}).${stream.codec === "MP3" ? "mp3" : "m4a"}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    setTimeout(() => {
-      setDownloadingQuality(null);
-    }, 2000);
+    const fileName = stream.fileName || audioFileName(trackData.artist, trackData.title, stream.bitrate, stream.codec);
+    saveFromCdn(stream.directUrl || stream.streamUrl, fileName, stream.downloadUrl)
+      .catch(() => {})
+      .finally(() => setDownloadingQuality(null));
   };
 
   // Auto-start the download when the visitor pressed Download in the link box
@@ -444,7 +441,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               {copiedLink ? "Track link copied" : "Share track link"}
             </button>
             <a href={trackData.spotifyUrl} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1.5">
-              Open on Spotify <ExternalLink className="h-4 w-4" strokeWidth={2.4} />
+              Open on {trackData.sourceName || "Spotify"} <ExternalLink className="h-4 w-4" strokeWidth={2.4} />
             </a>
           </div>
         </div>
