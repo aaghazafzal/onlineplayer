@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing & Coverage
+coverage/
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Cloudflare Wrangler
+.wrangler/
+.dev.vars*
+
+# Environment Variables & Secrets
+.env
+.env*.local
+.env.production
+.env.development
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Local research / scratch (third-party clones, test scripts) — not part of the app
+scrape/
+test_*.js
+__pycache__/
+
+# Local secrets for wrangler dev
+**/.dev.vars
+!**/.dev.vars.example

@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main] # main is covered by deploy.yml, which calls this workflow
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  workers:
+    name: Workers (tests + syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Spotify matcher tests
+        working-directory: backend/spotify/worker
+        run: node --test "test/*.test.js"
+
+      - name: Monitor state tests
+        working-directory: backend/monitor/worker
+        run: node --test "test/*.test.js"
+
+      - name: Syntax check (all workers + resolver)
+        run: |
+          for f in backend/*/worker/src/*.js backend/terabox/resolver/server.js; do
+            node --check "$f"
+          done
+
+      - name: Guard against committed secrets
+        run: |
+          if git grep -nE "op_sec_[0-9a-f]{8}|hdupeHui|ndus=[A-Za-z0-9_-]{20}|bot[0-9]{8,}:[A-Za-z0-9_-]{30}" -- . ':!*.md' ':!*.example' ':!.github/**'; then
+            echo "::error::Possible secret committed. Use wrangler secrets / Render env vars instead."
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-out
+          path: frontend/out
+          retention-days: 3

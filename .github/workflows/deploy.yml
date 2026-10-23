@@ -1,0 +1,123 @@
+name: Deploy
+
+# Deploys only the parts that changed in a push to main, after CI passes.
+# Needs repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+# (see README > Deployment). Without them the deploy jobs are skipped.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to deploy"
+        type: choice
+        default: all
+        options: [all, frontend, terabox, instagram, spotify, monitor]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      has_token: ${{ steps.token.outputs.has_token }}
+      frontend: ${{ steps.pick.outputs.frontend }}
+      terabox: ${{ steps.pick.outputs.terabox }}
+      instagram: ${{ steps.pick.outputs.instagram }}
+      spotify: ${{ steps.pick.outputs.spotify }}
+      monitor: ${{ steps.pick.outputs.monitor }}
+    steps:
+      - id: token
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then echo "has_token=true" >> "$GITHUB_OUTPUT"; else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set, skipping deploys."
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: pick
+        env:
+          TARGET: ${{ inputs.target }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          parts="frontend terabox instagram spotify monitor"
+          if [ -n "$TARGET" ]; then
+            for p in $parts; do
+              if [ "$TARGET" = all ] || [ "$TARGET" = "$p" ]; then echo "$p=true"; else echo "$p=false"; fi
+            done >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then BEFORE=HEAD~1; fi
+          changed=$(git diff --name-only "$BEFORE" HEAD || true)
+          echo "$changed"
+          has() { echo "$changed" | grep -qE "$1" && echo true || echo false; }
+          {
+            echo "frontend=$(has '^frontend/')"
+            echo "terabox=$(has '^backend/terabox/worker/')"
+            echo "instagram=$(has '^backend/instagram/worker/')"
+            echo "spotify=$(has '^backend/spotify/worker/')"
+            echo "monitor=$(has '^backend/monitor/worker/')"
+          } >> "$GITHUB_OUTPUT"
+
+  workers:
+    needs: [ci, plan]
+    if: needs.plan.outputs.has_token == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [terabox, instagram, spotify, monitor]
+    steps:
+      - name: Skip unchanged worker
+        id: gate
+        env:
+          CHANGED: ${{ needs.plan.outputs[matrix.worker] }}
+        run: echo "run=$CHANGED" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+      - name: Install
+        if: steps.gate.outputs.run == 'true'
+        working-directory: backend/${{ matrix.worker }}/worker
+        run: npm ci
+      - name: Deploy ${{ matrix.worker }} worker
+        if: steps.gate.outputs.run == 'true'
+        working-directory: backend/${{ matrix.worker }}/worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Secrets stored with `wrangler secret put` are kept across deploys
+        run: npx wrangler deploy
+
+  frontend:
+    needs: [ci, plan]
+    if: needs.plan.outputs.has_token == 'true' && needs.plan.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-out
+          path: out
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy to Cloudflare Pages (onlineplayer.site)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 pages deploy out --project-name onlineplayer --branch main --commit-hash "$GITHUB_SHA"
