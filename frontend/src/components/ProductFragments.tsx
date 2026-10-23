@@ -189,7 +189,7 @@ export function YouTubeFragment({ className = "" }: { className?: string }) {
       <figcaption data-ui className="mt-3 space-y-3">
         <div className="text-small">
           <p className="font-medium truncate">Stairs of light, a short film</p>
-          <p className="text-stage-muted">YouTube · plays in YouTube&apos;s own player</p>
+          <p className="text-stage-muted">YouTube · no ads · up to 1080p</p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-small">
           <span className="btn btn-accent min-h-[40px] text-small">MP4</span>

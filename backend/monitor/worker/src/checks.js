@@ -16,7 +16,8 @@ const INSTAGRAM_TEST_LINK = "https://www.instagram.com/p/DerUlPplt8G/";
 // does not depend on the monitor's own IP country.
 const SPOTIFY_TEST_LINK = "https://open.spotify.com/track/6VBhH7CyP56BXjp8VsDFPZ";
 const JIOSAAVN_TEST_LINK = "https://www.jiosaavn.com/song/kesariya/AgIAQyBeWlI";
-const YOUTUBE_TEST_LINK = "https://www.youtube.com/watch?v=jNQXAC9IVRw";
+const YOUTUBE_TEST_ID = "dQw4w9WgXcQ";
+const YOUTUBE_TEST_LINK = `https://www.youtube.com/watch?v=${YOUTUBE_TEST_ID}`;
 
 class CheckError extends Error {}
 
@@ -123,15 +124,21 @@ export const CHECKS = [
     },
   },
   {
-    // Playback uses YouTube's embedded player, so the check covers link resolving only
+    // Link resolving, then the ad-free stream down to the first media bytes
     id: "youtube",
-    name: "YouTube links",
+    name: "YouTube ad-free",
     async run({ deep }) {
       const { res, data } = await getJson(
         `https://youtube.onlineplayer.site/api/resolve?url=${encodeURIComponent(YOUTUBE_TEST_LINK)}${deep ? "&refresh=1" : ""}`,
         { timeoutMs: 30000 }
       );
       assert(res.ok && data.ok && data.title, `Resolve failed: ${data.error || `HTTP ${res.status}`}`);
+      const streams = await getJson(`https://youtube.onlineplayer.site/api/streams?v=${YOUTUBE_TEST_ID}`, { timeoutMs: 40000 });
+      assert(streams.res.ok && streams.data.ok && streams.data.hls, `Ad-free stream unavailable: ${streams.data.error || `HTTP ${streams.res.status}`}`);
+      const audio = streams.data.audio;
+      const seg = await get(`${streams.data.segBase}/${audio.itag}`, { headers: { Range: "bytes=0-1023" } });
+      assert(seg.status === 206, `Segment returned HTTP ${seg.status} instead of 206`);
+      await seg.body?.cancel();
     },
   },
 ];

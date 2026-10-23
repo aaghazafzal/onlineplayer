@@ -15,7 +15,7 @@ const PROVIDER_COPY: Record<ProviderKind, { name: string; gives: string; service
   instagram: { name: "Instagram post", gives: "videos and photos, every slide", service: "instagram" },
   spotify: { name: "Spotify link", gives: "full song at 320 kbps, or the whole playlist", service: "spotify" },
   jiosaavn: { name: "JioSaavn link", gives: "songs, albums, playlists and artists at 320 kbps", service: "jiosaavn" },
-  youtube: { name: "YouTube link", gives: "videos, Shorts and playlists in YouTube’s own player", service: "youtube" },
+  youtube: { name: "YouTube link", gives: "videos, Shorts and playlists without ads, up to 1080p", service: "youtube" },
   direct: { name: "Direct video file", gives: "plays as it is" },
   diskwala: { name: "DiskWala link", gives: "not supported yet" },
 };

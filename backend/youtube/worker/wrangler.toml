@@ -12,7 +12,18 @@ simple = { limit = 60, period = 60 }
 [[ratelimits]]
 name = "DOWNLOAD_LIMITER"
 namespace_id = "5002"
-simple = { limit = 6, period = 60 }
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "SEGMENT_LIMITER"
+namespace_id = "5003"
+simple = { limit = 600, period = 60 }
+
+# Player responses shared across colos: one YouTube lookup per video per few hours.
+# Free plan: 1k writes/day, so past that new videos fall back to the per-colo edge cache.
+[[kv_namespaces]]
+binding = "YT_PLAYERS"
+id = "6ad9587a7df34d21926e48efbaf4df2a"
 
 # Custom Domain for the YouTube worker
 [[routes]]

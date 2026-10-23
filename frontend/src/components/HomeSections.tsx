@@ -84,7 +84,7 @@ const SERVICES = [
     name: "YouTube",
     block: "bg-field-4",
     Fragment: YouTubeFragment,
-    fact: "Videos, Shorts and playlists play in YouTube's own player, with no limit. Downloads are attempted too, but YouTube sometimes blocks them.",
+    fact: "Videos, Shorts and playlists play here without ads, from 144p up to 1080p. Save any of them as MP4 in the quality you pick, or just the sound as M4A.",
   },
   {
     id: "direct",
@@ -335,12 +335,12 @@ const QUESTIONS: [string, string][] = [
     "The first time anyone opens a link, the full stream has to be found. After that it is cached, so it starts almost at once for a few hours.",
   ],
   [
-    "Why does a YouTube download sometimes fail?",
-    "YouTube often asks servers like ours to sign in before it hands over a file, and we do not get around that. Playing always works, because it uses YouTube's own player. If a download fails, try again in a few minutes.",
+    "Why do some YouTube videos show YouTube's own player?",
+    "Now and then YouTube asks our server to sign in before it hands over a video, and we do not get around that. For that video the page falls back to YouTube's player, which can show ads, and downloads wait until YouTube lets us through again, usually within minutes.",
   ],
   [
     "How do downloads work?",
-    "TeraBox videos are saved as MP4, assembled in your browser from the stream. Instagram media, Spotify and JioSaavn songs (.m4a) download directly, and YouTube offers MP4 or M4A when it allows it.",
+    "TeraBox videos are saved as MP4, assembled in your browser from the stream. Instagram media, Spotify and JioSaavn songs (.m4a) download directly, and YouTube videos are joined into one MP4 in your browser, with sound.",
   ],
   [
     "Does it work on my phone?",

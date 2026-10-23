@@ -95,13 +95,19 @@ interface VideoPlayerProps {
   streamData: StreamData;
   isTheaterMode: boolean;
   onToggleTheater: () => void;
+  /** Called when the video plays to its end (playlists move on) */
+  onEnded?: () => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   streamData,
   isTheaterMode,
   onToggleTheater,
+  onEnded,
 }) => {
+  // Qualities offered by an HLS master playlist (YouTube); -1 is automatic
+  const [hlsLevels, setHlsLevels] = useState<{ index: number; height: number }[]>([]);
+  const [hlsLevel, setHlsLevel] = useState(-1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -179,7 +185,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       hlsRef.current = hls;
       hls.loadSource(activeUrl);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        const levels = data.levels.map((l, index) => ({ index, height: l.height })).filter((l) => l.height);
+        if (levels.length > 1) {
+          setHlsLevels([...levels].sort((a, b) => b.height - a.height));
+          setHlsLevel(-1);
+          // Start sharp but not heavy: 720p on wide screens, 480p on phones
+          const cap = window.innerWidth > 800 ? 720 : 480;
+          const start = levels.filter((l) => l.height <= cap).sort((a, b) => b.height - a.height)[0];
+          if (start) hls.startLevel = start.index;
+        } else {
+          setHlsLevels([]);
+        }
         restorePosition(30);
         autoplay();
       });
@@ -520,7 +537,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <video
           ref={videoRef}
           onTimeUpdate={handleTimeUpdate}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={() => {
+            setIsPlaying(false);
+            onEnded?.();
+          }}
           onClick={togglePlay}
           className="w-full h-full object-contain cursor-pointer"
           playsInline
@@ -617,7 +637,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   title="Quality and speed"
                 >
                   <Settings className="h-4 w-4" strokeWidth={2.2} />
-                  <span className="hidden sm:inline">{hasMultiQuality ? `${selectedQuality}p` : `${playbackSpeed}x`}</span>
+                  <span className="hidden sm:inline">
+                    {hasMultiQuality
+                      ? `${selectedQuality}p`
+                      : hlsLevels.length > 1
+                        ? hlsLevel === -1
+                          ? "Auto"
+                          : `${hlsLevels.find((l) => l.index === hlsLevel)?.height}p`
+                        : `${playbackSpeed}x`}
+                  </span>
                 </button>
 
                 {showSettingsMenu && (
@@ -637,6 +665,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                             {selectedQuality === q && <Check className="h-4 w-4" strokeWidth={2.5} />}
                           </button>
                         ))}
+                      </div>
+                    )}
+                    {!hasMultiQuality && hlsLevels.length > 1 && (
+                      <div className="pb-3">
+                        <p className="px-1 pb-1 text-muted">Quality</p>
+                        <div className="max-h-56 overflow-y-auto">
+                          {[{ index: -1, height: 0 }, ...hlsLevels].map((l) => (
+                            <button
+                              key={l.index}
+                              onClick={() => {
+                                if (hlsRef.current) hlsRef.current.currentLevel = l.index;
+                                setHlsLevel(l.index);
+                                setShowSettingsMenu(false);
+                              }}
+                              className={`w-full min-h-[40px] px-2 rounded-ui text-left flex items-center justify-between transition-colors ${
+                                hlsLevel === l.index ? "bg-accent text-accent-ink font-medium" : "hover:bg-surface-2"
+                              }`}
+                            >
+                              <span>{l.index === -1 ? "Auto" : `${l.height}p${l.height >= 1080 ? " HD" : ""}`}</span>
+                              {hlsLevel === l.index && <Check className="h-4 w-4" strokeWidth={2.5} />}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                     <p className="px-1 pb-1 text-muted">Speed</p>
