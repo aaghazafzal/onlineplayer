@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, Moon, Sun, X, Keyboard } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { LogoMark } from "./LogoMark";
 
 interface SiteHeaderProps {
   onOpenShortcuts?: () => void;
@@ -19,7 +20,7 @@ const LINKS = [
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <Link href="/" className={`inline-flex items-center gap-2.5 font-semibold tracking-[-0.03em] text-ink ${className}`}>
-      <img src="/logo.png" alt="" width={32} height={32} className="h-8 w-8 object-contain" />
+      <LogoMark size={32} className="shrink-0" />
       <span className="text-[1.375rem] leading-none">OnlinePlayer</span>
     </Link>
   );

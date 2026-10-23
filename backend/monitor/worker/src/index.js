@@ -80,11 +80,12 @@ function renderStatusPage(state) {
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OnlinePlayer Status</title><meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="https://onlineplayer.site/icon.svg?v=4"><link rel="icon" href="https://onlineplayer.site/favicon.ico?v=4"><link rel="apple-touch-icon" href="https://onlineplayer.site/apple-icon.png?v=4">
 <style>
 :root{--bg:#f4f4f7;--card:#fff;--fg:#18181b;--mut:#71717a;--bd:#e4e4e7;--up:#16a34a;--down:#dc2626;--na:#d4d4d8}
 @media (prefers-color-scheme:dark){:root{--bg:#0e0e11;--card:#18181f;--fg:#f4f4f5;--mut:#a1a1aa;--bd:#27272a;--na:#3f3f46}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-main{max-width:720px;margin:0 auto;padding:40px 16px}h1{font-size:22px;margin:0 0 6px}
+main{max-width:720px;margin:0 auto;padding:40px 16px}h1{font-size:22px;margin:0 0 6px;display:flex;align-items:center;gap:10px}h1 svg{flex:none}
 .banner{padding:16px 18px;border-radius:14px;font-weight:700;margin:18px 0;color:#fff;background:${allOk ? "var(--up)" : "var(--down)"}}
 ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}.svc{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px 16px}
 .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.meta{margin-left:auto;color:var(--mut);font-size:13px}
@@ -93,7 +94,7 @@ ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}.svc{background:var(
 .bars i{flex:1;height:22px;border-radius:2px;background:var(--na)}.bars i.up{background:var(--up)}.bars i.down{background:var(--down)}
 footer{margin-top:20px;color:var(--mut);font-size:13px}a{color:inherit}
 </style></head><body><main>
-<h1>OnlinePlayer Status</h1>
+<h1><svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f5257"/><g fill="#f3f4fa" stroke="#f3f4fa" stroke-width="1.6" stroke-linejoin="round"><polygon points="21,14 26.5,17.19 26.5,46.81 21,50"/><polygon points="29.5,18.94 35,22.13 35,41.87 29.5,45.06"/><polygon points="38,23.87 43.5,27.06 43.5,36.94 38,40.13"/><polygon points="46.5,28.81 52,32 46.5,35.19"/></g></svg>OnlinePlayer Status</h1>
 <div class="banner">${checks.length === 0 ? "No checks have run yet" : allOk ? "All systems operational" : "Some services are having problems"}</div>
 <ul>${rows}</ul>
 <footer>Checked every 15 minutes · Last check: <time datetime="${updated || ""}">${updated ? updated.replace("T", " ").slice(0, 16) + " UTC" : "never"}</time> · <a href="https://onlineplayer.site">onlineplayer.site</a></footer>

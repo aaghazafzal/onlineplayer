@@ -11,23 +11,24 @@ export const metadata: Metadata = {
   description,
   icons: {
     icon: [
-      { url: "/icon.png?v=3", type: "image/png", sizes: "32x32" },
-      { url: "/favicon.ico?v=3", sizes: "any" },
+      { url: "/icon.svg?v=4", type: "image/svg+xml" },
+      { url: "/icon.png?v=4", type: "image/png", sizes: "32x32" },
+      { url: "/favicon.ico?v=4", sizes: "any" },
     ],
-    shortcut: "/favicon.ico?v=3",
-    apple: "/apple-icon.png?v=3",
+    shortcut: "/favicon.ico?v=4",
+    apple: "/apple-icon.png?v=4",
   },
   openGraph: {
     title: "OnlinePlayer: paste a link, play it whole",
     description,
-    images: [{ url: "/logo.png", width: 512, height: 512, alt: "OnlinePlayer" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "OnlinePlayer: paste a link, play it whole" }],
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "OnlinePlayer: paste a link, play it whole",
     description,
-    images: ["/logo.png"],
+    images: ["/og.png"],
   },
 };
 
@@ -52,9 +53,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://api.fontshare.com" />
         <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
         <link href="https://api.fontshare.com/v2/css?f[]=chillax@400,500,600&display=swap" rel="stylesheet" />
-        <link rel="icon" type="image/png" href="/icon.png?v=3" sizes="32x32" />
-        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" />
-        <link rel="apple-touch-icon" href="/apple-icon.png?v=3" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg?v=4" />
+        <link rel="icon" type="image/png" href="/icon.png?v=4" sizes="32x32" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=4" />
+        <link rel="apple-touch-icon" href="/apple-icon.png?v=4" />
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider>{children}</ThemeProvider>
