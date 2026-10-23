@@ -1,0 +1,23 @@
+{
+  "name": "instagram-player-api",
+  "version": "1.0.0",
+  "description": "Ultra-Fast Instagram Reel, Video & Story Streaming Engine & Direct Downloader on Cloudflare Workers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "keywords": [
+    "instagram",
+    "reels",
+    "downloader",
+    "video-player",
+    "cloudflare-worker",
+    "stream-proxy"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.131.2"
+  }
+}

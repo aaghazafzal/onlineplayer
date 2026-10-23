@@ -1,0 +1,25 @@
+name = "instagram-player-api"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Cloudflare KV Namespace for ultra-fast caching (95%+ load reduction)
+[[kv_namespaces]]
+binding = "INSTAGRAM_CACHE"
+id = "0fa0c9984382481fb8dd1522b463571e"
+
+# Per-IP rate limit for /api/resolve (Workers Rate Limiting API, no KV writes)
+[[ratelimits]]
+name = "RESOLVE_LIMITER"
+namespace_id = "3001"
+simple = { limit = 60, period = 60 }
+
+[vars]
+# Cache duration in seconds (2 hours = 7200s)
+CACHE_TTL = "7200"
+
+# Custom Domain for Instagram Worker
+[[routes]]
+pattern = "instagram.onlineplayer.site"
+custom_domain = true

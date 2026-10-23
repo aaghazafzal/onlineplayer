@@ -1,0 +1,39 @@
+name = "terabox-player-api"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Cloudflare KV Namespace for resolve-result caching
+[[kv_namespaces]]
+binding = "TERABOX_CACHE"
+id = "40c06f180fa94237bcc58cb2efd667df"
+
+# Per-IP rate limits (Workers Rate Limiting API, no KV writes)
+[[ratelimits]]
+name = "RESOLVE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 15, period = 60 }
+
+[[ratelimits]]
+name = "SEARCH_LIMITER"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }
+
+[vars]
+# Cache duration in seconds (4 hours = 14400s)
+CACHE_TTL = "14400"
+
+# Cloud Micro-Resolver (Render Web Service)
+RESOLVER_URL = "https://terabox-resolver-csit.onrender.com"
+
+# Secrets (set with `wrangler secret put <NAME>`, never commit values):
+#   DEFAULT_JS_TOKEN  - TeraBox jsToken
+#   COOKIE_POOL       - comma/newline separated ndus cookies
+#   RESOLVER_SECRET   - shared secret with the Render resolver (x-resolver-secret)
+# For local `wrangler dev`, put them in .dev.vars (see .dev.vars.example).
+
+# Custom Domain for TeraBox Worker
+[[routes]]
+pattern = "terabox.onlineplayer.site"
+custom_domain = true

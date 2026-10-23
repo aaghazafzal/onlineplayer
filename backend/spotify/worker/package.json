@@ -1,0 +1,28 @@
+{
+  "name": "spotify-player-api",
+  "version": "1.0.0",
+  "description": "Spotify track resolver: exact-recording matching to full-length 320/160 kbps AAC streams on Cloudflare Workers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "npm test && wrangler deploy",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "keywords": [
+    "spotify",
+    "music-player",
+    "audio-stream",
+    "320kbps",
+    "downloader",
+    "cloudflare-worker"
+  ],
+  "author": "OnlinePlayer",
+  "license": "MIT",
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.131.2"
+  },
+  "type": "module"
+}

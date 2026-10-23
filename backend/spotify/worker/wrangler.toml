@@ -1,0 +1,25 @@
+name = "spotify-player-api"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Cloudflare KV Namespace for resolve-result caching
+[[kv_namespaces]]
+binding = "SPOTIFY_CACHE"
+id = "0d99edb77cab4239914a98b60d39db7f"
+
+# Per-IP rate limit for /api/resolve (Workers Rate Limiting API, no KV writes)
+[[ratelimits]]
+name = "RESOLVE_LIMITER"
+namespace_id = "2001"
+simple = { limit = 40, period = 60 }
+
+[vars]
+# Cache duration for full-length matches in seconds (24 hours)
+CACHE_TTL = "86400"
+
+# Custom Domain for Spotify Worker
+[[routes]]
+pattern = "spotify.onlineplayer.site"
+custom_domain = true
