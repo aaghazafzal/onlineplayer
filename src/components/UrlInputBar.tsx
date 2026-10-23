@@ -93,13 +93,13 @@ export const UrlInputBar: React.FC<UrlInputBarProps> = ({
       case "instagram":
         return "Paste your Instagram Reel or Post video link here...";
       case "spotify":
-        return "Paste your Spotify Track link here (open.spotify.com/track/...)...";
+        return "Paste Spotify Track, Playlist, or Album link (open.spotify.com/...)...";
       case "diskwala":
         return "Paste your DiskWala link here (diskwala.com)...";
       case "direct":
         return "Paste direct MP4 or M3U8 video stream URL...";
       default:
-        return "Paste any supported cloud video link here (TeraBox, etc.)...";
+        return "Paste any TeraBox, Instagram, or Spotify (Track / Playlist / Album) link here...";
     }
   };
 

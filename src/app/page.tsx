@@ -7,6 +7,7 @@ import { VideoPlayer, StreamData } from "../components/VideoPlayer";
 import { VideoMetaCard, FileItem } from "../components/VideoMetaCard";
 import { InstagramPostViewer, InstagramPostData } from "../components/InstagramPostViewer";
 import { AudioPlayer, SpotifyTrackData } from "../components/AudioPlayer";
+import { SpotifyPlaylistViewer, SpotifyPlaylistData } from "../components/SpotifyPlaylistViewer";
 import { RecentStreams, HistoryItem } from "../components/RecentStreams";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { resolveLink } from "../lib/resolvers";
@@ -73,6 +74,7 @@ export default function Home() {
   const [streamData, setStreamData] = useState<StreamData | null>(null);
   const [instagramData, setInstagramData] = useState<InstagramPostData | null>(null);
   const [spotifyData, setSpotifyData] = useState<SpotifyTrackData | null>(null);
+  const [spotifyPlaylistData, setSpotifyPlaylistData] = useState<SpotifyPlaylistData | null>(null);
   const [filesList, setFilesList] = useState<FileItem[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [isCachedHit, setIsCachedHit] = useState(false);
@@ -146,6 +148,7 @@ export default function Home() {
       setStreamData(null);
       setInstagramData(null);
       setSpotifyData(null);
+      setSpotifyPlaylistData(null);
       setFilesList([]);
       setCurrentFileIndex(0);
       setIsCachedHit(false);
@@ -160,6 +163,10 @@ export default function Home() {
           break;
         case "spotify":
           setSpotifyData(result.track);
+          saveToHistory(result.history);
+          break;
+        case "spotify_playlist":
+          setSpotifyPlaylistData(result.playlist);
           saveToHistory(result.history);
           break;
         case "terabox":
@@ -236,7 +243,7 @@ export default function Home() {
           <div className="max-w-5xl mx-auto p-5 sm:p-6 rounded-3xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-sm flex items-start gap-3.5 shadow-sm">
             <AlertCircle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" strokeWidth={2.4} />
             <div className="space-y-1.5">
-              <p className="font-bold text-base">Unable to resolve video stream</p>
+              <p className="font-bold text-base">Unable to resolve media link</p>
               <p className="text-xs sm:text-sm text-red-600 dark:text-red-400 leading-relaxed">{errorMessage}</p>
               <a
                 href="#providers"
@@ -249,10 +256,15 @@ export default function Home() {
           </div>
         )}
 
-        {/* Active Player Section (Appears when video, Instagram post or Spotify track is loaded) */}
-        {(streamData || instagramData || spotifyData) && (
+        {/* Active Player Section (Appears when video, Instagram post or Spotify track/playlist is loaded) */}
+        {(streamData || instagramData || spotifyData || spotifyPlaylistData) && (
           <div id="player-container" className="space-y-8 pt-4 scroll-mt-24">
-            {spotifyData ? (
+            {spotifyPlaylistData ? (
+              <SpotifyPlaylistViewer
+                playlistData={spotifyPlaylistData}
+                autoStartDownload={autoStartDownload}
+              />
+            ) : spotifyData ? (
               <AudioPlayer
                 trackData={spotifyData}
                 autoStartDownload={autoStartDownload}

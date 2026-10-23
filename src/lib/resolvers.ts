@@ -2,8 +2,11 @@ import type { StreamData } from "../components/VideoPlayer";
 import type { FileItem } from "../components/VideoMetaCard";
 import type { InstagramMediaItem, InstagramPostData } from "../components/InstagramPostViewer";
 import type { SpotifyTrackData } from "../components/AudioPlayer";
+import type { SpotifyPlaylistData, SpotifyPlaylistItem } from "../components/SpotifyPlaylistViewer";
 import type { HistoryItem } from "../components/RecentStreams";
 import { ApiError, fetchProviderJson } from "./api";
+
+export type { SpotifyPlaylistData, SpotifyPlaylistItem };
 
 export type ProviderKind = "direct" | "instagram" | "spotify" | "terabox" | "diskwala";
 
@@ -11,6 +14,7 @@ export type ResolveResult =
   | { kind: "direct"; stream: StreamData }
   | { kind: "instagram"; post: InstagramPostData; history: HistoryItem }
   | { kind: "spotify"; track: SpotifyTrackData; history: HistoryItem }
+  | { kind: "spotify_playlist"; playlist: SpotifyPlaylistData; history: HistoryItem }
   | { kind: "terabox"; files: FileItem[]; stream: StreamData; cached: boolean; history: HistoryItem | null };
 
 const TERABOX_HOST_HINTS = [
@@ -23,7 +27,13 @@ export function detectProvider(rawUrl: string): ProviderKind | null {
   const path = url.split(/[?#]/)[0];
   if (path.endsWith(".m3u8") || path.endsWith(".mp4")) return "direct";
   if (url.includes("instagram.com") || url.includes("instagr.am")) return "instagram";
-  if (url.includes("spotify.com") || url.includes("spotify.link") || url.startsWith("spotify:track:")) return "spotify";
+  if (
+    url.includes("spotify.com") ||
+    url.includes("spotify.link") ||
+    url.startsWith("spotify:track:") ||
+    url.startsWith("spotify:playlist:") ||
+    url.startsWith("spotify:album:")
+  ) return "spotify";
   if (TERABOX_HOST_HINTS.some((h) => url.includes(h)) || url.includes("surl=") || url.includes("/s/1")) return "terabox";
   if (url.includes("diskwala")) return "diskwala";
   return null;
@@ -104,12 +114,79 @@ async function resolveInstagram(url: string): Promise<ResolveResult> {
   };
 }
 
-type SpotifyApiResponse = Partial<SpotifyTrackData> & { error?: string };
+type SpotifyAnyApiResponse = {
+  ok?: boolean;
+  error?: string;
+  provider?: "spotify";
+  type?: "track" | "playlist" | "album";
+  // track fields
+  trackId?: string;
+  title?: string;
+  artist?: string;
+  album?: string;
+  year?: string;
+  duration?: number;
+  durationFormatted?: string;
+  cover?: string;
+  streamUrl?: string;
+  directStreamUrl?: string;
+  streams?: SpotifyTrackData["streams"];
+  previewUrl?: string | null;
+  isFullLength?: boolean;
+  match?: SpotifyTrackData["match"];
+  spotifyUrl?: string;
+  // playlist / album fields
+  id?: string;
+  subtitle?: string;
+  trackCount?: number;
+  totalDuration?: number;
+  totalDurationFormatted?: string;
+  tracks?: SpotifyPlaylistItem[];
+};
 
 async function resolveSpotify(url: string): Promise<ResolveResult> {
-  const { status, data } = await fetchProviderJson<SpotifyApiResponse>("spotify", `/api/resolve?url=${enc(url)}`);
-  if (status >= 400 || !data.ok || !data.streamUrl) {
-    throw new ApiError(data.error || "Could not resolve this Spotify track. Please check that the link is a public track.", status);
+  const { status, data } = await fetchProviderJson<SpotifyAnyApiResponse>("spotify", `/api/resolve?url=${enc(url)}`);
+  if (status >= 400 || !data.ok) {
+    throw new ApiError(data.error || "Could not resolve this Spotify link. Please check that the link is public and active.", status);
+  }
+
+  // Playlist or Album
+  if (data.type === "playlist" || data.type === "album") {
+    const playlist: SpotifyPlaylistData = {
+      ok: true,
+      provider: "spotify",
+      type: data.type,
+      id: data.id || "",
+      title: data.title || (data.type === "album" ? "Spotify Album" : "Spotify Playlist"),
+      subtitle: data.subtitle || "",
+      cover: data.cover || "",
+      trackCount: data.trackCount || data.tracks?.length || 0,
+      totalDuration: data.totalDuration || 0,
+      totalDurationFormatted: data.totalDurationFormatted || "",
+      tracks: data.tracks || [],
+      spotifyUrl: data.spotifyUrl || url,
+    };
+
+    const typeLabel = playlist.type === "album" ? "Album" : "Playlist";
+    return {
+      kind: "spotify_playlist",
+      playlist,
+      history: {
+        surl: playlist.id || url,
+        originalUrl: url,
+        title: `${playlist.title}${playlist.subtitle ? ` · ${playlist.subtitle}` : ""}`,
+        durationFormatted: `${playlist.trackCount} Songs`,
+        sizeFormatted: `Spotify ${typeLabel}`,
+        thumbnail: playlist.cover || "/providers/spotify.png",
+        streamUrl: url,
+        playedAt: Date.now(),
+      },
+    };
+  }
+
+  // Single track
+  if (!data.streamUrl) {
+    throw new ApiError(data.error || "Could not resolve an audio stream for this track.", status);
   }
 
   const track: SpotifyTrackData = {
