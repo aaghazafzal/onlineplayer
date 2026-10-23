@@ -11,7 +11,9 @@
  *   - Premium Glassmorphism Web Player with HLS.js, Quality Switching, VLC Support
  */
 
-import CryptoJS from "crypto-js";
+// Only the AES pieces of crypto-js (the full library is ~200 KB and costs cold-start CPU)
+import CryptoJS from "crypto-js/core";
+import "crypto-js/aes";
 
 const DEFAULT_HEADERS = {
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -60,6 +62,76 @@ function isOriginAllowed(origin) {
     );
   } catch {
     return false;
+  }
+}
+
+// The stream proxy only talks to TeraBox. Anything else is refused, so the
+// cookie pool can never be sent to a third-party host.
+const TERABOX_HOST_SUFFIXES = [
+  "terabox.app", "terabox.com", "teraboxapp.com", "terabox.fun", "teraboxlink.com", "teraboxshare.com",
+  "1024tera.com", "1024terabox.com", "nephobox.com", "dubox.com", "mirrobox.com", "momerybox.com",
+  "tibibox.com", "freeterabox.com", "terasharelink.com", "terafileshare.com", "4funbox.com",
+];
+
+function isTeraboxUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    const host = u.hostname.toLowerCase();
+    return TERABOX_HOST_SUFFIXES.some((s) => host === s || host.endsWith("." + s));
+  } catch {
+    return false;
+  }
+}
+
+// Recover the original CDN URL from a "/proxy?url=..." segment line
+function unwrapProxiedSegment(line) {
+  try {
+    const u = new URL(line.trim());
+    if (u.pathname !== "/proxy") return line;
+    const raw = u.searchParams.get("url");
+    return raw && isTeraboxUrl(raw) ? raw : line;
+  } catch {
+    return line;
+  }
+}
+
+// Point every segment of an m3u8 at the TeraBox CDN directly. Used for browsers
+// with native HLS (iOS/Android), which need no CORS: zero Worker requests per segment.
+function toDirectPlaylist(m3u8) {
+  return m3u8
+    .split("\n")
+    .map((l) => (l.startsWith("http") ? unwrapProxiedSegment(l) : l))
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Edge cache (Cache API): free and unmetered, unlike KV (1k writes/day on free).
+// Per data centre, which is fine for resolve results that are cheap to rebuild.
+// ---------------------------------------------------------------------------
+function edgeCacheKey(host, key) {
+  return new Request(`https://${host}/__edge-cache/${encodeURIComponent(key)}`);
+}
+
+async function edgeGet(host, key, type = "json") {
+  try {
+    const res = await caches.default.match(edgeCacheKey(host, key));
+    if (!res) return null;
+    return type === "json" ? await res.json() : await res.text();
+  } catch {
+    return null;
+  }
+}
+
+async function edgePut(host, key, value, ttlSeconds) {
+  try {
+    const body = typeof value === "string" ? value : JSON.stringify(value);
+    await caches.default.put(
+      edgeCacheKey(host, key),
+      new Response(body, { headers: { "Cache-Control": `public, max-age=${Math.max(60, ttlSeconds)}` } })
+    );
+  } catch {
+    // cache is best-effort
   }
 }
 
@@ -601,6 +673,15 @@ async function handleStreamProxy(request, urlObj, env) {
     return new Response(null, { headers: CORS_HEADERS });
   }
 
+  if (!isTeraboxUrl(streamUrl)) {
+    return new Response(JSON.stringify({ error: "Only TeraBox stream URLs can be proxied." }), {
+      status: 403,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS }
+    });
+  }
+
+  const directSegments = urlObj.searchParams.get("direct") === "1";
+
   try {
     const pool = getCookiePool(env);
     const cookie = pool.length > 0 ? pool[0] : "";
@@ -623,16 +704,23 @@ async function handleStreamProxy(request, urlObj, env) {
       const fullCookie = randsk ? `${cookie}; BDCLND=${randsk}` : cookie;
       if (fullCookie) upstreamHeaders.set("Cookie", fullCookie);
     } else {
-      // Binary Video Segment (.ts) or direct stream request -> Set TeraBox CDN referer & auth cookie
+      // Binary video segment: the CDN URL is pre-signed, so no account cookie is sent
       upstreamHeaders.set("Referer", "https://dm.terabox.app/");
-      if (cookie) upstreamHeaders.set("Cookie", cookie);
     }
 
-    const upstreamRes = await fetch(streamUrl, {
-      method: request.method,
-      headers: upstreamHeaders,
-      redirect: "follow"
-    });
+    // Follow redirects by hand so the cookie is never carried to a non-TeraBox host
+    let target = streamUrl;
+    let upstreamRes = await fetch(target, { method: request.method, headers: upstreamHeaders, redirect: "manual" });
+    for (let hop = 0; hop < 5 && [301, 302, 303, 307, 308].includes(upstreamRes.status); hop++) {
+      target = new URL(upstreamRes.headers.get("Location") || "", target).toString();
+      if (!isTeraboxUrl(target)) {
+        return new Response(JSON.stringify({ error: "Upstream redirected outside TeraBox." }), {
+          status: 502,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS }
+        });
+      }
+      upstreamRes = await fetch(target, { method: request.method, headers: upstreamHeaders, redirect: "manual" });
+    }
 
     const contentType = upstreamRes.headers.get("Content-Type") || "";
 
@@ -648,11 +736,13 @@ async function handleStreamProxy(request, urlObj, env) {
         });
       }
 
-      // Rewrite segment URLs to pass through worker proxy
+      // Rewrite segment URLs to pass through worker proxy (or leave them direct for native HLS players)
       const host = urlObj.host;
-      const rewritten = text.replace(/(https?:\/\/[^\s\r\n]+)/g, (match) => {
-        return `https://${host}/proxy?url=${encodeURIComponent(match)}&surl=${surl || ""}&name=segment.ts`;
-      });
+      const rewritten = directSegments
+        ? text
+        : text.replace(/(https?:\/\/[^\s\r\n]+)/g, (match) => {
+            return `https://${host}/proxy?url=${encodeURIComponent(match)}&surl=${surl || ""}&name=segment.ts`;
+          });
 
       return new Response(rewritten, {
         status: 200,
@@ -1221,76 +1311,30 @@ export default {
         });
       }
 
-    // WAP Multi-Domain Debug Route
-    if (url.pathname === "/api/debug-wap") {
-      const surl = url.searchParams.get("surl") || "yyN0lTInlL9ZKtSl5EJWsA";
-      const pool = getCookiePool(env);
-      const cookie = pool[0] || "";
-      
-      const testDomains = [
-        "www.terabox.app",
-        "dm.terabox.app",
-        "www.1024terabox.com",
-        "dm.1024terabox.com",
-        "www.1024tera.com",
-        "www.nephobox.com",
-        "www.mirrobox.com",
-        "www.momerybox.com",
-        "www.tibibox.com",
-        "www.freeterabox.com",
-        "www.terasharelink.com",
-        "www.terafileshare.com"
-      ];
-
-      const results = {};
-      for (const d of testDomains) {
-        try {
-          const testUrl = `https://${d}/wap/share/filelist?surl=${surl}`;
-          const res = await fetch(testUrl, {
-            headers: {
-              ...MOBILE_HEADERS,
-              "Cookie": cookie
-            },
-            redirect: "follow"
-          });
-          const text = await res.text();
-          const hasState = text.includes("window.__INITIAL_STATE__");
-          const hasVerify = text.includes("need verify") || text.includes("400141");
-          results[d] = {
-            status: res.status,
-            len: text.length,
-            hasInitialState: hasState,
-            hasVerify: hasVerify,
-            preview: text.slice(0, 150)
-          };
-        } catch(e) {
-          results[d] = { error: e.message };
-        }
-      }
-
-      return new Response(JSON.stringify(results, null, 2), {
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS }
-      });
-    }
-
     // Direct Full M3U8 Playlist from KV (with optional Cloud Resolver fallback)
     if (url.pathname.startsWith("/playlist/")) {
       const match = url.pathname.match(/\/playlist\/([a-zA-Z0-9_\-]+)\.m3u8/);
       if (match) {
         const surlKey = match[1];
-        if (env.TERABOX_CACHE) {
-          const m3u8Content = await env.TERABOX_CACHE.get(`m3u8:${surlKey}`);
-          if (m3u8Content) {
-            return new Response(m3u8Content, {
-              status: 200,
-              headers: {
-                "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
-                "Cache-Control": "public, max-age=14400",
-                ...CORS_HEADERS
-              }
-            });
-          }
+        // ?direct=1: segments point straight at the CDN (native HLS players need no CORS)
+        const direct = url.searchParams.get("direct") === "1";
+        const playlistResponse = (body) =>
+          new Response(direct ? toDirectPlaylist(body) : body, {
+            status: 200,
+            headers: {
+              "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
+              "Cache-Control": "public, max-age=3600",
+              ...CORS_HEADERS
+            }
+          });
+
+        // Edge cache first (free), then KV (written once per video by the resolver)
+        let m3u8Content = await edgeGet(url.host, `m3u8:${surlKey}`, "text");
+        if (!m3u8Content && env.TERABOX_CACHE) {
+          m3u8Content = await env.TERABOX_CACHE.get(`m3u8:${surlKey}`);
+          if (m3u8Content) ctx.waitUntil(edgePut(url.host, `m3u8:${surlKey}`, m3u8Content, 3600));
         }
+        if (m3u8Content) return playlistResponse(m3u8Content);
 
         // If not found in KV, but RESOLVER_URL is set, fetch directly from Cloud Resolver
         if (env.RESOLVER_URL) {
@@ -1303,17 +1347,8 @@ export default {
             });
             if (res.ok) {
               const cloudM3u8 = await res.text();
-              if (env.TERABOX_CACHE) {
-                ctx.waitUntil(env.TERABOX_CACHE.put(`m3u8:${surlKey}`, cloudM3u8, { expirationTtl: 14400 }));
-              }
-              return new Response(cloudM3u8, {
-                status: 200,
-                headers: {
-                  "Content-Type": "application/vnd.apple.mpegurl; charset=utf-8",
-                  "Cache-Control": "public, max-age=14400",
-                  ...CORS_HEADERS
-                }
-              });
+              ctx.waitUntil(edgePut(url.host, `m3u8:${surlKey}`, cloudM3u8, 3600));
+              return playlistResponse(cloudM3u8);
             }
           } catch (resErr) {
             console.warn("Cloud resolver playlist fetch failed:", resErr.message);
@@ -1324,13 +1359,23 @@ export default {
     }
 
     // Cache Full Stream M3U8 API
+    // Only the Render resolver (shared secret) may push playlists, otherwise anyone
+    // could overwrite a video's playlist (cache poisoning) or burn KV writes.
     if (url.pathname === "/api/cache-stream" && request.method === "POST") {
+      if (!env.RESOLVER_SECRET || request.headers.get("x-resolver-secret") !== env.RESOLVER_SECRET) {
+        return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS }
+        });
+      }
       try {
         const body = await request.json();
         const { surl, metadata, m3u8 } = body;
-        if (surl && metadata && m3u8 && env.TERABOX_CACHE) {
-          await env.TERABOX_CACHE.put(`tb:${surl}`, JSON.stringify(metadata), { expirationTtl: 14400 });
+        const validSurl = typeof surl === "string" && /^[A-Za-z0-9_-]{4,64}$/.test(surl);
+        if (validSurl && metadata && typeof m3u8 === "string" && m3u8.startsWith("#EXTM3U") && env.TERABOX_CACHE) {
+          // One KV write per video (cross-region playlist handoff); metadata stays in the edge cache
           await env.TERABOX_CACHE.put(`m3u8:${surl}`, m3u8, { expirationTtl: 14400 });
+          ctx.waitUntil(edgePut(url.host, `m3u8:${surl}`, m3u8, 3600));
           return new Response(JSON.stringify({ ok: true, message: "Cached full stream successfully" }), {
             headers: { "Content-Type": "application/json", ...CORS_HEADERS }
           });
@@ -1389,9 +1434,10 @@ export default {
                           inputUrl.includes("refresh=1");
         const cacheKey = `tb:${surl}`;
 
-        if (env.TERABOX_CACHE) {
+        {
           try {
-            cached = await env.TERABOX_CACHE.get(cacheKey, "json");
+            // Edge cache only: KV writes are capped at 1k/day on the free plan
+            cached = await edgeGet(url.host, cacheKey, "json");
             // Only return cache if it's a full stream (not 30-sec preview fallback) and not forced refresh
             if (!isRefresh && cached && cached.ok && cached.mode === "full_hls_stream" && cached.files && cached.files.length > 0) {
               return new Response(JSON.stringify({ ...cached, cached: true }), {
@@ -1456,13 +1502,10 @@ export default {
           throw new Error("Could not extract playable stream from TeraBox link. Please check link validity or try again.");
         }
 
-        if (env.TERABOX_CACHE && result.ok) {
-          const ttl = parseInt(env.CACHE_TTL || "14400", 10);
-          ctx.waitUntil(
-            env.TERABOX_CACHE.put(cacheKey, JSON.stringify(result), {
-              expirationTtl: Math.max(60, ttl)
-            }).catch(e => console.error("KV write error:", e))
-          );
+        if (result.ok && result.mode === "full_hls_stream") {
+          // Signed stream URLs stay valid for a few hours; keep the cache well inside that
+          const ttl = Math.min(parseInt(env.CACHE_TTL || "14400", 10), 7200);
+          ctx.waitUntil(edgePut(url.host, cacheKey, result, ttl));
         }
 
         return new Response(JSON.stringify(result), {
@@ -1506,9 +1549,9 @@ export default {
 
         const cacheKey = `search_v4:${q.trim().toLowerCase()}:${sort}:${quality}:${duration}:${offset}:${limit}`;
 
-        if (env.TERABOX_CACHE) {
+        {
           try {
-            const cachedSearch = await env.TERABOX_CACHE.get(cacheKey, "json");
+            const cachedSearch = await edgeGet(url.host, cacheKey, "json");
             if (cachedSearch && cachedSearch.list && cachedSearch.list.length > 0) {
               return new Response(JSON.stringify({ ...cachedSearch, cached: true }), {
                 status: 200,
@@ -1603,10 +1646,8 @@ export default {
           list: validItems
         };
 
-        if (env.TERABOX_CACHE && validItems.length > 0) {
-          ctx.waitUntil(
-            env.TERABOX_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: 1800 }).catch(() => {})
-          );
+        if (validItems.length > 0) {
+          ctx.waitUntil(edgePut(url.host, cacheKey, result, 1800));
         }
 
         return new Response(JSON.stringify(result), {

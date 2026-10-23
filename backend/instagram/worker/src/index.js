@@ -89,7 +89,47 @@ function baseConvert(d, e, f) {
   return k || "0";
 }
 
-function decodeSnapSave(h, u, n, t, e) {
+// Fast path, same output as decodeSnapSaveReference: one lookup table instead of
+// building n.length RegExps per character (that version cost ~160 ms CPU per post,
+// far over the free plan's 10 ms). Falls back when n has digits/duplicates, where
+// the sequential-replace semantics of the reference can differ.
+export function decodeSnapSave(h, u, n, t, e) {
+  if (/[0-9.*+?^${}()|[\]\\]/.test(n) || new Set(n).size !== n.length) return decodeSnapSaveReference(h, u, n, t, e);
+
+  const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/".slice(0, e);
+  const digitValue = (d) => Math.max(0, alphabet.indexOf(d)); // outside base e: counts as 0, keeps its place
+
+  // Per input char code: the base-e digits it contributes. A char of n becomes the
+  // decimal digits of its index (index 12 -> "1","2"); any other char is itself.
+  const table = new Map();
+  for (let j = 0; j < n.length; j++) table.set(n.charCodeAt(j), String(j).split("").map(digitValue));
+  const sepCode = n.charCodeAt(e);
+
+  const out = [];
+  let value = 0;
+  for (let i = 0; i < h.length; i++) {
+    const code = h.charCodeAt(i);
+    if (code === sepCode) {
+      out.push(value - t);
+      value = 0;
+      continue;
+    }
+    const digits = table.get(code);
+    if (digits) {
+      for (let k = 0; k < digits.length; k++) value = value * e + digits[k];
+    } else {
+      value = value * e + digitValue(h[i]); // Horner: same as summing digit * e^position
+    }
+  }
+  // The reference emits a char for a trailing chunk with no separator too
+  if (h.length && h.charCodeAt(h.length - 1) !== sepCode) out.push(value - t);
+
+  let r = "";
+  for (let i = 0; i < out.length; i += 8192) r += String.fromCharCode.apply(null, out.slice(i, i + 8192));
+  return decodeURIComponent(escape(r));
+}
+
+export function decodeSnapSaveReference(h, u, n, t, e) {
   let r = "";
   for (let i = 0, len = h.length; i < len; i++) {
     let s = "";
@@ -210,9 +250,12 @@ async function resolveViaSnapSave(targetUrl, requestUrl) {
       const proxyStreamUrl = `${originUrl}/api/proxy?url=${encodeURIComponent(finalDirectUrl)}`;
       const downloadEndpointUrl = `${originUrl}/api/download?url=${encodeURIComponent(finalDirectUrl)}&filename=${encodeURIComponent(filename || "instagram_video.mp4")}`;
 
+      // Instagram's CDN allows cross-origin embedding (CORP cross-origin, ACAO *), so
+      // playback goes direct and costs no Worker requests; proxy_url is the fallback.
       medias.push({
         type: isVideo ? "video" : "photo",
-        stream_url: proxyStreamUrl,
+        stream_url: isInstagramCdn(finalDirectUrl) ? finalDirectUrl : proxyStreamUrl,
+        proxy_url: proxyStreamUrl,
         download_url: downloadEndpointUrl,
         direct_url: finalDirectUrl,
         thumbnail: thumb,
@@ -222,6 +265,40 @@ async function resolveViaSnapSave(targetUrl, requestUrl) {
   }
 
   return medias;
+}
+
+function isInstagramCdn(rawUrl) {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase();
+    return new URL(rawUrl).protocol === "https:" && (host.endsWith(".cdninstagram.com") || host.endsWith(".fbcdn.net"));
+  } catch {
+    return false;
+  }
+}
+
+// Edge cache (Cache API): free and unmetered, unlike KV writes (1k/day on the free plan)
+function edgeCacheKey(host, key) {
+  return new Request(`https://${host}/__edge-cache/${encodeURIComponent(key)}`);
+}
+
+async function edgeGet(host, key) {
+  try {
+    const res = await caches.default.match(edgeCacheKey(host, key));
+    return res ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function edgePut(host, key, value, ttlSeconds) {
+  try {
+    await caches.default.put(
+      edgeCacheKey(host, key),
+      new Response(JSON.stringify(value), { headers: { "Cache-Control": `public, max-age=${Math.max(60, ttlSeconds)}` } })
+    );
+  } catch {
+    // best-effort
+  }
 }
 
 // Fallback: oEmbed API for metadata & fallback info
@@ -320,13 +397,13 @@ export default {
       }
 
       const shortcode = extractShortcode(targetUrl);
-      const cacheKey = `ig:media:${shortcode}`;
+      const cacheKey = `ig:media:v2:${shortcode}`;
 
       // Check Cloudflare KV Cache (?refresh=1 forces a live extraction, used by the health monitor)
       const forceRefresh = url.searchParams.get("refresh") === "1";
-      if (env.INSTAGRAM_CACHE && shortcode !== "unknown" && !forceRefresh) {
+      if (shortcode !== "unknown" && !forceRefresh) {
         try {
-          const cached = await env.INSTAGRAM_CACHE.get(cacheKey, "json");
+          const cached = await edgeGet(url.host, cacheKey);
           if (cached) {
             return new Response(JSON.stringify({ ...cached, _cache: "HIT" }), {
               headers: {
@@ -341,16 +418,26 @@ export default {
         }
       }
 
-      // Execute Primary Resolver
+      // Execute Primary Resolver (SnapSave is occasionally flaky: one retry), oEmbed in parallel
       try {
-        const medias = await resolveViaSnapSave(targetUrl, request.url);
+        const oembedPromise = fetchInstagramOEmbed(targetUrl);
+        let medias = [];
+        let lastErr = null;
+        for (let attempt = 0; attempt < 2 && medias.length === 0; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 600));
+          try {
+            medias = (await resolveViaSnapSave(targetUrl, request.url)) || [];
+          } catch (e) {
+            lastErr = e;
+          }
+        }
 
         if (!medias || medias.length === 0) {
+          if (lastErr) console.warn("SnapSave failed twice:", lastErr.message);
           throw new Error("No playable video or media found for this link. Make sure the Instagram account or post is public.");
         }
 
-        // Fetch oEmbed metadata in background or parallel for title and author info
-        const oembed = await fetchInstagramOEmbed(targetUrl);
+        const oembed = await oembedPromise;
 
         const primaryMedia = medias.find(m => m.type === "video") || medias[0];
         const title = (oembed && oembed.title) 
@@ -375,9 +462,11 @@ export default {
         };
 
         // Cache in KV
-        if (env.INSTAGRAM_CACHE && shortcode !== "unknown") {
+        if (shortcode !== "unknown") {
           const ttl = parseInt(env.CACHE_TTL || "7200", 10);
-          ctx.waitUntil(env.INSTAGRAM_CACHE.put(cacheKey, JSON.stringify(responsePayload), { expirationTtl: ttl }));
+          ctx.waitUntil(edgePut(url.host, cacheKey, responsePayload, ttl));
+          // Longer-lived copy served only if a later live extraction fails
+          ctx.waitUntil(edgePut(url.host, `stale:${cacheKey}`, responsePayload, 86400));
         }
 
         return new Response(JSON.stringify(responsePayload), {
@@ -390,6 +479,12 @@ export default {
 
       } catch (err) {
         console.error("Instagram resolve error:", err);
+        const stale = shortcode !== "unknown" ? await edgeGet(url.host, `stale:${cacheKey}`) : null;
+        if (stale) {
+          return new Response(JSON.stringify({ ...stale, _cache: "STALE" }), {
+            headers: { "Content-Type": "application/json", "X-Cache": "STALE", ...CORS_HEADERS }
+          });
+        }
         return new Response(JSON.stringify({
           status: "error",
           error: err.message || "Failed to resolve Instagram video link. Verify that the link is public and active."

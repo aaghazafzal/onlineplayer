@@ -383,7 +383,8 @@ async function resolveTeraBoxStream(surl, options = {}) {
     try {
       fetch(`${workerUrl}/api/cache-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The worker only accepts playlist pushes that carry the shared secret
+        headers: { 'Content-Type': 'application/json', 'x-resolver-secret': RESOLVER_SECRET },
         body: JSON.stringify({
           surl: surl,
           metadata: metadata,

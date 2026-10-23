@@ -4,7 +4,10 @@
  * KV caching, HTTP 206 range proxy, host-allowlisted media proxy.
  */
 
-import CryptoJS from "crypto-js";
+// Only the DES-ECB pieces of crypto-js (the full library is ~200 KB and costs cold-start CPU)
+import CryptoJS from "crypto-js/core";
+import "crypto-js/tripledes";
+import "crypto-js/mode-ecb";
 import { buildQueries, confidenceLabel, decodeEntities, pickBestMatch } from "./matcher.js";
 
 const CACHE_VERSION = "v2";
@@ -190,13 +193,33 @@ async function fetchEmbedEntity(trackId) {
 }
 
 // The public track page carries "Artist · Album · Song · Year" in og:description
+/** Read a response body as text until `marker` appears or `maxBytes` is reached, then cancel. */
+async function readUntil(res, marker, maxBytes) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  try {
+    while (text.length < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      if (text.includes(marker)) break;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return text;
+}
+
 async function fetchTrackPageInfo(trackId) {
   try {
     const res = await fetch(`https://open.spotify.com/track/${trackId}`, {
       headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
     });
     if (!res.ok) return null;
-    const html = await res.text();
+    // The og: tags live in <head>; stop reading there instead of decoding the whole
+    // ~170 KB page (saves CPU on the free plan's 10 ms budget).
+    const html = await readUntil(res, "</head>", 96 * 1024);
     const desc = html.match(/<meta property="og:description" content="([^"]*)"/)?.[1];
     const title = html.match(/<meta property="og:title" content="([^"]*)"/)?.[1];
     const image = html.match(/<meta property="og:image" content="([^"]*)"/)?.[1];
@@ -391,6 +414,35 @@ function contentDisposition(filename) {
 }
 
 // ---------------------------------------------------------------------------
+// Edge cache (Cache API). Free and unmetered; KV writes are capped at 1k/day on
+// the free plan, which a popular day would exhaust.
+// ---------------------------------------------------------------------------
+
+function edgeCacheKey(host, key) {
+  return new Request(`https://${host}/__edge-cache/${encodeURIComponent(key)}`);
+}
+
+async function edgeGet(host, key) {
+  try {
+    const res = await caches.default.match(edgeCacheKey(host, key));
+    return res ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function edgePut(host, key, value, ttlSeconds) {
+  try {
+    await caches.default.put(
+      edgeCacheKey(host, key),
+      new Response(JSON.stringify(value), { headers: { "Cache-Control": `public, max-age=${Math.max(60, ttlSeconds)}` } })
+    );
+  } catch {
+    // best-effort
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Request handlers
 // ---------------------------------------------------------------------------
 
@@ -439,9 +491,9 @@ async function handleCollectionResolve(type, id, url, env, ctx, origin) {
   const forceRefresh = url.searchParams.get("refresh") === "1";
   const cacheKey = `spotify:${CACHE_VERSION}:${type}:${id}`;
 
-  if (env.SPOTIFY_CACHE && !forceRefresh) {
+  if (!forceRefresh) {
     try {
-      const cached = await env.SPOTIFY_CACHE.get(cacheKey, { type: "json" });
+      const cached = await edgeGet(url.host, cacheKey);
       if (cached) return jsonResponse({ ...cached, fromCache: true }, 200, origin, { "X-Cache": "HIT" });
     } catch {
       // cache miss on error
@@ -460,10 +512,8 @@ async function handleCollectionResolve(type, id, url, env, ctx, origin) {
     );
   }
 
-  if (env.SPOTIFY_CACHE) {
-    const ttl = type === "album" ? 604800 : 21600; // 7 days for album, 6 hours for playlist
-    ctx.waitUntil(env.SPOTIFY_CACHE.put(cacheKey, JSON.stringify(collection), { expirationTtl: ttl }).catch(() => {}));
-  }
+  const ttl = type === "album" ? 604800 : 21600; // 7 days for album, 6 hours for playlist
+  ctx.waitUntil(edgePut(url.host, cacheKey, collection, ttl));
 
   return jsonResponse(collection, 200, origin, { "X-Cache": "MISS" });
 }
@@ -508,9 +558,9 @@ async function handleResolve(request, url, env, ctx, origin) {
   const region = request.cf?.country === "IN" ? "in" : "intl";
   const cacheKey = `spotify:${CACHE_VERSION}:${region}:track:${trackId}`;
 
-  if (env.SPOTIFY_CACHE && !forceRefresh) {
+  if (!forceRefresh) {
     try {
-      const cached = await env.SPOTIFY_CACHE.get(cacheKey, { type: "json" });
+      const cached = await edgeGet(url.host, cacheKey);
       if (cached) return jsonResponse({ ...cached, fromCache: true }, 200, origin, { "X-Cache": "HIT" });
     } catch {
       // cache miss on error
@@ -532,7 +582,10 @@ async function handleResolve(request, url, env, ctx, origin) {
   // Behind the custom domain the public origin is always https
   const base = /^(localhost|127.0.0.1)$/.test(url.hostname) ? url.origin : `https://${url.host}`;
   const label = safeFilename(`${meta.artists || "Spotify"} - ${meta.title}`);
+  // Playback goes straight to the CDN (it allows any origin + Range), so seeking costs
+  // no Worker requests; /api/proxy stays available as a fallback.
   const proxied = (u) => `${base}/api/proxy?url=${encodeURIComponent(u)}`;
+  const playable = (u) => u;
   const download = (u, suffix) =>
     `${base}/api/download?url=${encodeURIComponent(u)}&filename=${encodeURIComponent(`${label}${suffix}`)}`;
 
@@ -547,7 +600,8 @@ async function handleResolve(request, url, env, ctx, origin) {
         quality: "320 kbps (High)",
         bitrate: "320k",
         codec: "AAC",
-        streamUrl: proxied(audio.audio320),
+        streamUrl: playable(audio.audio320),
+        proxyUrl: proxied(audio.audio320),
         directUrl: audio.audio320,
         downloadUrl: download(audio.audio320, " (320kbps).m4a"),
       });
@@ -556,7 +610,8 @@ async function handleResolve(request, url, env, ctx, origin) {
       quality: "160 kbps (Standard)",
       bitrate: "160k",
       codec: "AAC",
-      streamUrl: proxied(audio.audio160),
+      streamUrl: playable(audio.audio160),
+      proxyUrl: proxied(audio.audio160),
       directUrl: audio.audio160,
       downloadUrl: download(audio.audio160, " (160kbps).m4a"),
     });
@@ -575,7 +630,8 @@ async function handleResolve(request, url, env, ctx, origin) {
       quality: "Official Preview (30s)",
       bitrate: "preview",
       codec: "MP3",
-      streamUrl: proxied(meta.previewUrl),
+      streamUrl: playable(meta.previewUrl),
+      proxyUrl: proxied(meta.previewUrl),
       directUrl: meta.previewUrl,
       downloadUrl: download(meta.previewUrl, " (Preview).mp3"),
     });
@@ -614,10 +670,8 @@ async function handleResolve(request, url, env, ctx, origin) {
     spotifyUrl: `https://open.spotify.com/track/${trackId}`,
   };
 
-  if (env.SPOTIFY_CACHE) {
-    const ttl = isFullLength ? parseInt(env.CACHE_TTL || "86400", 10) : PREVIEW_CACHE_TTL;
-    ctx.waitUntil(env.SPOTIFY_CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: ttl }).catch(() => {}));
-  }
+  const ttl = isFullLength ? parseInt(env.CACHE_TTL || "86400", 10) : PREVIEW_CACHE_TTL;
+  ctx.waitUntil(edgePut(url.host, cacheKey, payload, ttl));
 
   if (debug) {
     payload.debug = ranked.slice(0, 8).map((r) => ({
