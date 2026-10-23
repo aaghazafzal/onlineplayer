@@ -34,6 +34,7 @@ interface StreamsInfo {
   ok: boolean;
   error?: string;
   botCheck?: boolean;
+  limited?: boolean;
   title?: string;
   channel?: string;
   duration?: number;
@@ -67,6 +68,8 @@ export function YouTubeViewer({ data, autoStartDownload = false }: YouTubeViewer
   const [currentId, setCurrentId] = useState(isPlaylist ? data.startVideoId || data.videos![0].id : data.id);
   const [streams, setStreams] = useState<StreamsInfo | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
+  // Where to resume in YouTube's player if our stream is cut off mid-video
+  const [resumeAt, setResumeAt] = useState(0);
   const [theater, setTheater] = useState(false);
   const [pickedItag, setPickedItag] = useState<number | null>(null);
   const [dl, setDl] = useState<DlState>(null);
@@ -84,18 +87,19 @@ export function YouTubeViewer({ data, autoStartDownload = false }: YouTubeViewer
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStreams(null);
     setPickedItag(null);
+    setResumeAt(0);
     (async () => {
       let last: StreamsInfo = { ok: false };
-      // YouTube's sign-in check comes and goes: try a few times before falling back
-      for (let attempt = 0; attempt < 3 && alive; attempt++) {
-        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt));
+      // YouTube's sign-in check comes and goes: one more try before falling back (the worker already tries several clients)
+      for (let attempt = 0; attempt < 2 && alive; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
         try {
           const { data: s } = await fetchProviderJson<StreamsInfo>("youtube", `/api/streams?v=${currentId}`);
-          last = s.ok ? s : { ok: false, error: s.error, botCheck: s.botCheck };
+          last = s.ok ? s : { ok: false, error: s.error, botCheck: s.botCheck, limited: s.limited };
         } catch (err) {
           last = { ok: false, error: err instanceof Error ? err.message : "Could not reach the YouTube worker." };
         }
-        if (last.ok || !last.botCheck) break;
+        if (last.ok || !last.botCheck) break; // "limited" will not change within minutes
       }
       if (alive) setStreams(last);
     })();
@@ -154,7 +158,7 @@ export function YouTubeViewer({ data, autoStartDownload = false }: YouTubeViewer
   }, [autoStartDownload, adFree]);
 
   const busy = dl?.stage === "downloading" || dl?.stage === "joining";
-  const embedSrc = `https://www.youtube-nocookie.com/embed/${currentId}?${new URLSearchParams({ autoplay: "1", rel: "0", playsinline: "1" })}`;
+  const embedSrc = `https://www.youtube-nocookie.com/embed/${currentId}?${new URLSearchParams({ autoplay: "1", rel: "0", playsinline: "1", ...(resumeAt > 0 ? { start: String(resumeAt) } : {}) })}`;
 
   const dlButton = (kind: "video" | "audio", label: string, style: string) => {
     const mine = dl?.kind === kind;
@@ -207,6 +211,10 @@ export function YouTubeViewer({ data, autoStartDownload = false }: YouTubeViewer
             isTheaterMode={theater}
             onToggleTheater={() => setTheater((t) => !t)}
             onEnded={goNext}
+            onPlaybackFailed={(t) => {
+              setResumeAt(Math.floor(t));
+              setStreams({ ok: false, limited: true, error: "YouTube stopped serving this video to our server partway." });
+            }}
           />
         ) : (
           <div className="rounded-ui bg-stage overflow-clip">
@@ -245,7 +253,7 @@ export function YouTubeViewer({ data, autoStartDownload = false }: YouTubeViewer
             </span>
           </p>
         )}
-        {streams && !adFree && !streams.live && (
+        {streams && !adFree && !streams.live && !streams.limited && (
           <button type="button" onClick={() => setRetryNonce((n) => n + 1)} className="btn btn-accent min-h-[48px]">
             Try ad-free again
           </button>

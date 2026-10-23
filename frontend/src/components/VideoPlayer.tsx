@@ -97,6 +97,8 @@ interface VideoPlayerProps {
   onToggleTheater: () => void;
   /** Called when the video plays to its end (playlists move on) */
   onEnded?: () => void;
+  /** Called with the current time when the stream stops being served (the page can switch source) */
+  onPlaybackFailed?: (time: number) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -104,7 +106,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   isTheaterMode,
   onToggleTheater,
   onEnded,
+  onPlaybackFailed,
 }) => {
+  const failedRef = useRef(onPlaybackFailed);
+  useEffect(() => {
+    failedRef.current = onPlaybackFailed;
+  }, [onPlaybackFailed]);
   // Qualities offered by an HLS master playlist (YouTube); -1 is automatic
   const [hlsLevels, setHlsLevels] = useState<{ index: number; height: number }[]>([]);
   const [hlsLevel, setHlsLevel] = useState(-1);
@@ -200,14 +207,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         restorePosition(30);
         autoplay();
       });
+      let networkFailures = 0;
+      const giveUp = () => {
+        const at = video.currentTime;
+        destroyHls();
+        if (failedRef.current) failedRef.current(at);
+        else setPlayerError("Playback stopped. Press Play to retry, or open the link again.");
+      };
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        networkFailures = 0;
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-        else {
-          setPlayerError("Playback stopped. Press Play to retry, or open the link again.");
-          destroyHls();
-        }
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          // A server that refuses (4xx/5xx) twice will not start serving again: stop looping
+          const status = (data.response as { code?: number } | undefined)?.code || 0;
+          networkFailures++;
+          if (networkFailures > 2 || (status >= 400 && networkFailures > 1)) giveUp();
+          else setTimeout(() => hlsRef.current === hls && hls.startLoad(), 1500 * networkFailures);
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else giveUp();
       });
     };
 

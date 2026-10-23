@@ -17,7 +17,7 @@ import { masterPlaylist, mediaPlaylist, mergeRefs, parseRange, parseSidx, pickHl
 import { parseYouTubeUrl, playlistFromNext, safeFilename, thumbnails } from "./yt.js";
 
 const WEB_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3"; // v3: every cached player passed fullAccess()
 const CHUNK = 10 * 1024 * 1024; // googlevideo serves large files fastest in ranged chunks
 const MAX_RANGE = 16 * 1024 * 1024; // one /seg response at most
 
@@ -39,8 +39,11 @@ const CLIENTS = {
     extra: { deviceMake: "Oculus", deviceModel: "Quest 3", androidSdkVersion: 32, osName: "Android", osVersion: "12L" },
   },
 };
-// YouTube's sign-in check depends on load per egress IP, so a retry often lands elsewhere
-const CLIENT_ORDER = ["IOS", "ANDROID_VR", "IOS", "ANDROID_VR", "IOS"];
+// Android VR first: its files stream in full without a PO token. iOS files of some videos
+// (music videos, VEVO) stop after the first few MB, which fullAccess() detects.
+// Few attempts: every extra lookup makes YouTube's sign-in check stricter.
+const CLIENT_ORDER = ["ANDROID_VR", "IOS", "ANDROID_VR"];
+const LIMITED_TTL = 30 * 60; // a refused video is not retried for half an hour
 
 function isOriginAllowed(origin) {
   if (!origin) return true;
@@ -138,12 +141,49 @@ async function callPlayer(clientName, videoId) {
 
 const FORMAT_FIELDS = ["itag", "url", "mimeType", "width", "height", "fps", "bitrate", "averageBitrate", "contentLength", "initRange", "indexRange", "approxDurationMs", "qualityLabel", "audioQuality"];
 
+const limitedKey = (v) => `yt:${CACHE_VERSION}:limited:${v}`;
+
+async function isLimited(env, host, v) {
+  if (await edgeGet(host, limitedKey(v), "text")) return true;
+  const shared = env.YT_PLAYERS ? await env.YT_PLAYERS.get(limitedKey(v)).catch(() => null) : null;
+  return Boolean(shared);
+}
+
+/** Remember that YouTube refuses this video, so nobody else gets a stream that stalls */
+function markLimited(env, host, v, ctx) {
+  const playerKey = `yt:${CACHE_VERSION}:player:${v}`;
+  ctx.waitUntil(edgePut(host, limitedKey(v), "1", LIMITED_TTL, "text/plain"));
+  ctx.waitUntil(edgeDelete(host, playerKey));
+  if (env.YT_PLAYERS) {
+    ctx.waitUntil(env.YT_PLAYERS.put(limitedKey(v), "1", { expirationTtl: LIMITED_TTL }).catch(() => {}));
+    ctx.waitUntil(env.YT_PLAYERS.delete(playerKey).catch(() => {}));
+  }
+}
+
+/** True when YouTube serves the middle of the main video file, not only its first few MB */
+async function fullAccess(player) {
+  const { videos } = pickHlsFormats({ adaptiveFormats: player.adaptiveFormats });
+  const f = videos.find((x) => x.height <= 720) || videos[0];
+  if (!f) return true;
+  const size = parseInt(f.contentLength || "0", 10);
+  if (size < 9 * 1024 * 1024) return true;
+  const at = Math.floor(size * 0.7);
+  try {
+    const res = await fetch(`${f.url}&range=${at}-${at + 1023}`, { headers: { "User-Agent": CLIENTS[player.client].ua } });
+    await res.arrayBuffer();
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The playable formats of a video, cached per colo until shortly before the URLs expire.
  * Returns { ok: true, player } or { ok: false, reason, botCheck }.
  */
 async function getPlayer(env, host, videoId, ctx, { fresh = false } = {}) {
   const key = `yt:${CACHE_VERSION}:player:${videoId}`;
+  if (await isLimited(env, host, videoId)) return { ok: false, limited: true, reason: "limited" };
   if (!fresh) {
     const cached = await edgeGet(host, key);
     if (cached) return { ok: true, player: cached };
@@ -155,6 +195,7 @@ async function getPlayer(env, host, videoId, ctx, { fresh = false } = {}) {
     }
   }
   let lastReason = "unavailable";
+  let sawLimited = false;
   for (const [attempt, name] of CLIENT_ORDER.entries()) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 150 + Math.random() * 250));
     let data;
@@ -185,11 +226,20 @@ async function getPlayer(env, host, videoId, ctx, { fresh = false } = {}) {
       lastReason = "no direct formats";
       continue;
     }
+    if (!(await fullAccess(player))) {
+      lastReason = "limited";
+      sawLimited = true;
+      continue;
+    }
     const ttl = Math.min(parseInt(sd.expiresInSeconds || "21600", 10) - 1200, 5 * 3600);
     player.expiresAt = Date.now() + ttl * 1000;
     ctx.waitUntil(edgePut(host, key, player, ttl));
     if (env.YT_PLAYERS) ctx.waitUntil(env.YT_PLAYERS.put(key, JSON.stringify(player), { expirationTtl: Math.max(60, Math.floor(ttl)) }).catch(() => {}));
     return { ok: true, player };
+  }
+  if (sawLimited) {
+    markLimited(env, host, videoId, ctx);
+    return { ok: false, limited: true, reason: lastReason };
   }
   return { ok: false, reason: lastReason, botCheck: /bot|sign in|login/i.test(lastReason) };
 }
@@ -205,13 +255,16 @@ function playerError(result, origin) {
     {
       ok: false,
       botCheck: result.botCheck,
-      error: result.botCheck
-        ? "YouTube is asking our server to sign in right now, so ad-free playback is not available for this video at the moment."
-        : `YouTube does not allow this video to be played here (${result.reason}).`,
+      limited: result.limited,
+      error: result.limited
+        ? "YouTube lets our server stream only the first few seconds of this video, so ad-free playback and downloads are off for it."
+        : result.botCheck
+          ? "YouTube is asking our server to sign in right now, so ad-free playback is not available for this video at the moment."
+          : `YouTube does not allow this video to be played here (${result.reason}).`,
     },
     503,
     origin,
-    { "X-Download-Error": result.botCheck ? "bot-check" : "unavailable", "Cache-Control": "no-store" }
+    { "X-Download-Error": result.limited ? "limited" : result.botCheck ? "bot-check" : "unavailable", "Cache-Control": "no-store" }
   );
 }
 
@@ -309,7 +362,7 @@ async function handleMaster(url, env, ctx, origin, v) {
 }
 
 async function handleMedia(url, env, ctx, origin, v, itag) {
-  const key = `yt:${CACHE_VERSION}:media:${v}:${itag}`;
+  const key = `yt:${CACHE_VERSION}:media-s10:${v}:${itag}`;
   const cached = await edgeGet(url.host, key, "text");
   if (cached) return text(cached, "application/vnd.apple.mpegurl", origin, { "Cache-Control": "private, max-age=3600", "X-Cache": "HIT" });
 
@@ -322,12 +375,12 @@ async function handleMedia(url, env, ctx, origin, v, itag) {
   const indexEnd = parseInt(f.indexRange.end, 10);
   const res = await fetch(`${f.url}&range=${indexStart}-${indexEnd}`, { headers: { "User-Agent": CLIENTS[result.player.client].ua } });
   if (!res.ok) {
-    ctx.waitUntil(edgeDelete(url.host, `yt:${CACHE_VERSION}:player:${v}`));
-    if (env.YT_PLAYERS) ctx.waitUntil(env.YT_PLAYERS.delete(`yt:${CACHE_VERSION}:player:${v}`).catch(() => {}));
-    return json({ ok: false, error: `YouTube refused the index (HTTP ${res.status}). Reload to try again.` }, 502, origin);
+    markLimited(env, url.host, v, ctx);
+    return playerError({ ok: false, limited: true, reason: "limited" }, origin);
   }
   const { refs } = parseSidx(new Uint8Array(await res.arrayBuffer()), indexEnd);
-  const body = mediaPlaylist({ initEnd: parseInt(f.initRange.end, 10), segments: mergeRefs(refs, 20), segUrl: `https://${url.host}/seg/${v}/${itag}` });
+  const body = mediaPlaylist({ initEnd: parseInt(f.initRange.end, 10), // ~10 s video segments keep seeking quick; audio is light, so fewer, longer parts
+    segments: mergeRefs(refs, f.mimeType?.startsWith("audio/") ? 30 : 10, 6 * 1024 * 1024), segUrl: `https://${url.host}/seg/${v}/${itag}` });
   // The playlist holds no URLs from YouTube, so it outlives the player cache
   ctx.waitUntil(edgePut(url.host, key, body, 86400, "application/vnd.apple.mpegurl"));
   return text(body, "application/vnd.apple.mpegurl", origin, { "Cache-Control": "private, max-age=3600", "X-Cache": "MISS" });
@@ -340,9 +393,9 @@ async function handleSegment(request, url, env, ctx, origin, v, itag) {
     if (!success) return json({ ok: false, error: "Too many requests. Please slow down." }, 429, origin, { "Retry-After": "30" });
   }
 
-  let result = await getPlayer(env, url.host, v, ctx);
+  const result = await getPlayer(env, url.host, v, ctx);
   if (!result.ok) return playerError(result, origin);
-  let f = findFormat(result.player, itag);
+  const f = findFormat(result.player, itag);
   if (!f) return json({ ok: false, error: "Unknown format" }, 404, origin);
   const total = parseInt(f.contentLength || "0", 10);
   if (!total) return json({ ok: false, error: "This format has no known size." }, 404, origin);
@@ -367,14 +420,12 @@ async function handleSegment(request, url, env, ctx, origin, v, itag) {
   if (hit) return new Response(request.method === "HEAD" ? null : hit.body, { status: partial ? 206 : 200, headers: headers("HIT") });
   if (request.method === "HEAD") return new Response(null, { status: partial ? 206 : 200, headers: headers("MISS") });
 
-  let upstream = await fetch(`${f.url}&range=${start}-${end}`, { headers: { "User-Agent": CLIENTS[result.player.client].ua } });
+  const upstream = await fetch(`${f.url}&range=${start}-${end}`, { headers: { "User-Agent": CLIENTS[result.player.client].ua } });
   if (upstream.status === 403 || upstream.status === 410) {
-    // URL expired or refused: ask YouTube again once
-    result = await getPlayer(env, url.host, v, ctx, { fresh: true });
-    if (!result.ok) return playerError(result, origin);
-    f = findFormat(result.player, itag);
-    if (!f) return json({ ok: false, error: "Format no longer offered" }, 404, origin);
-    upstream = await fetch(`${f.url}&range=${start}-${end}`, { headers: { "User-Agent": CLIENTS[result.player.client].ua } });
+    // Player URLs are cached well inside their lifetime, so a refusal here means YouTube
+    // stopped serving this file to us. Asking again would only tighten its sign-in check.
+    markLimited(env, url.host, v, ctx);
+    return playerError({ ok: false, limited: true, reason: "limited" }, origin);
   }
   if (!upstream.ok || !upstream.body) return json({ ok: false, error: `YouTube answered HTTP ${upstream.status}` }, 502, origin);
 
