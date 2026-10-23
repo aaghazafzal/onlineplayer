@@ -15,7 +15,8 @@ export function HeroStage() {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Desktop only (the stage is hidden on phones), and still under reduced motion
+    if (!matchMedia("(min-width: 1024px)").matches || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let timer: ReturnType<typeof setInterval> | null = null;
     const start = () => {
       timer = setInterval(() => setActive((i) => (i + 1) % STAGE_FRAGMENTS.length), 6000);

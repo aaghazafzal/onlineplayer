@@ -164,12 +164,12 @@ export default function Home() {
         {/* ============ Hero: the paper card with the tool, beside the stage ============ */}
         <section id="play" aria-labelledby="hero-title" className="scroll-mt-20">
           <div className="frame grid grid-cols-1 lg:grid-cols-2 gap-3 pb-3 lg:min-h-[calc(100svh-72px)]">
-            {/* On phones the stage comes first and the card overlaps its foot */}
-            <div className="order-1 lg:order-2 lg:sticky lg:top-[84px] lg:h-[calc(100svh-96px)]">
+            {/* The stage of sample players is desktop only; phones open straight on the link box */}
+            <div className="hidden lg:block lg:order-2 lg:sticky lg:top-[84px] lg:h-[calc(100svh-96px)]">
               <HeroStage />
             </div>
 
-            <div className="order-2 lg:order-1 relative z-10 -mt-6 lg:mt-0 mx-2 lg:mx-0 flex flex-col rounded-ui bg-paper overflow-clip">
+            <div className="lg:order-1 relative z-10 flex flex-col rounded-ui bg-paper overflow-clip">
               <Segments count={40} played={0.72} markAt={6} play className="h-10 lg:h-14 gap-[3px] px-0" />
 
               <div className="flex flex-1 flex-col justify-center px-5 sm:px-10 lg:px-14 py-10 lg:py-14">
